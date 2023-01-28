@@ -1,0 +1,106 @@
+new Vue({
+    "el":"#app",
+    "data":{},
+    "methods":{
+        "commonParam":function () {
+            axios({
+                "method":"post",
+                "url":"/demo/AjaxServlet?method=commonParam",
+                "params":{  //：所有请求参数都被放到URL地址后面了，哪怕我们现在用的是POST请求方式。
+                    "userName":"tom",
+                    "userPwd":"123456"
+                }
+                //回调函数：开发人员声明，但是调用时交给系统来调用。
+                像单击响应函数、then()、catch()里面传入的都是回调函数。
+                回调函数是相对于普通函数来说的，普通函数就是开发人员自己声明，自己调用：
+            }).then(function (response) {
+                console.log(response);
+            }).catch(function (error) {
+                console.log(error);
+            });
+        }
+    }
+});
+
+
+javaweb阶段的后端获取
+public class AjaxServlet extends ModelBaseServlet {
+    protected void commonParam(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+        String userName = request.getParameter("userName");
+        String userPwd = request.getParameter("userPwd");
+
+        System.out.println("userName = " + userName);
+        System.out.println("userPwd = " + userPwd);
+
+        response.setContentType("text/html;charset=UTF-8");
+        response.getWriter().write("服务器端返回普通文本字符串作为响应");
+
+    }
+}
+
+
+-----------------------------json（data）
+ axios({
+            "method":"post",
+            "url":"/demo/AjaxServlet?method=requestBodyJSON",
+            "data":{
+                "stuId": 55,
+                "stuName": "tom",
+                "subjectList": [
+                    {
+                        "subjectName": "java",
+                        "subjectScore": 50.55
+                    },
+                    {
+                        "subjectName": "php",
+                        "subjectScore": 30.26
+                    }
+                ],
+                "teacherMap": {
+                    "one": {
+                        "teacherName":"tom",
+                        "tearcherAge":23
+                    },
+                    "two": {
+                        "teacherName":"jerry",
+                        "tearcherAge":31
+                    },
+                },
+                "school": {
+                    "schoolId": 23,
+                    "schoolName": "atguigu"
+                }
+            }
+        }).then(function (response) {
+            console.log(response);
+        }).catch(function (error) {
+            console.log(error);
+        });
+
+Javaweb阶段的后端获取：（SpringMVC之后，一个@RequestBody注解就能够搞定，）
+protected void requestBodyJSON(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+    // 1.由于请求体数据有可能很大，所以Servlet标准在设计API的时候要求我们通过输入流来读取
+    BufferedReader reader = request.getReader();
+    // 2.创建StringBuilder对象来累加存储从请求体中读取到的每一行
+    StringBuilder builder = new StringBuilder();
+    // 3.声明临时变量
+    String bufferStr = null;
+    // 4.循环读取
+    while((bufferStr = reader.readLine()) != null) {
+        builder.append(bufferStr);
+    }
+    // 5.关闭流
+    reader.close();
+    // 6.累加的结果就是整个请求体
+    String requestBody = builder.toString()
+    // 7.创建Gson对象用于解析JSON字符串
+    Gson gson = new Gson();
+    // 8.将JSON字符串还原为Java对象
+    Student student = gson.fromJson(requestBody, Student.class);
+    System.out.println("student = " + student);
+    System.out.println("requestBody = " + requestBody);
+    response.setContentType("text/html;charset=UTF-8");
+    response.getWriter().write("服务器端返回普通文本字符串作为响应");
+}

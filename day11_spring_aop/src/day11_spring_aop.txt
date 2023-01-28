@@ -1,0 +1,297 @@
+1.AOP面向切面编程，
+    面向对象是纵向处理，AOP是横向抽取
+    AOP（Aspect Oriented Programming）是一种设计思想，是软件设计领域中的面向切面编程，
+        它是面向对象编程的一种补充和完善，它以通过`预编译方式`和运行期`动态代理方式`
+        实现在`不修改源代码的情况下给程序动态统一添加额外功能`的一种技术。
+    作用：
+        简化代码：把方法中固定位置的重复的代码**抽取**出来
+        代码增强：把特定的功能封装到切面类中，看哪里有需要，就往上套，被套用了切面逻辑的方法就被切面给增强了。
+2.相关术语
+    a)横切关注点(例如：计算器中的日志功能)
+        从每个方法中抽取出来的同一类非核心业务
+        一个附加功能对应一个横切关注点
+    b)通知
+        每一个横切关注点上要做的事情都需要写一个方法来实现，这样的方法就叫通知方法。
+        我们把一个横切关注点（目标对象中）抽取出来后，把其放入一个切面类中进行封装，此时横切关注点就称为一个通知方法
+            横切关注点--》目标对象中
+            通知---》切面
+        - 前置通知：在被代理的目标方法前执行
+        - 返回通知：在被代理的目标方法成功结束后执行（**寿终正寝**）
+        - 异常通知：在被代理的目标方法异常结束后执行（**死于非命**）
+        - 后置通知：在被代理的目标方法最终结束后执行（**盖棺定论**）
+        - 环绕通知：使用try...catch...finally结构围绕**整个**被代理的目标方法，包括上面四种通知对应的所有位置
+    c)切面
+        封装通知方法的类。
+    d)目标
+        被代理的目标对象。
+    e)代理
+        向目标对象应用通知之后创建的代理对象。
+    f)连接点（纯逻辑概念）
+        抽取横切关注点的位置
+    g)切入点（从代码层面说明连接点）
+        定位连接点的方式。
+------------------------------基于注解的AOP--------------------------------------------------------
+3.Spring基于注解的AOP
+    AspectJ注解层
+    具体实现层（动态代理jdk(有接口) or cglib(无接口)）
+    ------------------------
+    3.1AspectJ：
+        本质上是静态代理，**将代理逻辑“织入”被代理的目标类编译得到的字节码文件**，
+        所以最终效果是动态的。weaver就是织入器。Spring只是借用了AspectJ中的注解。
+
+
+4.实验
+
+AOP:抽横切关注点，封装到切面中，封装为一个通知方法，再把通知方法通过切入点表达式作用到连接点上
+
+    4.1导入依赖
+        在导入依赖时，我们在IOC所需依赖基础上添加 spring-aspects，
+        而且 spring-aspects又依赖aspectjweaver，所以无需手动设置AspectJ
+    4.2设置Calculator和CalculatorImpl
+        创建切面，创建通知，通过切入点表达式把通知作用到连接点
+    4.3创建切面类LoggerAspect（关于日志的切面类）
+
+    4.4创建spring配置文件（aop-annotation.xml）
+        因为aop是ioc基础上实现的，因此必须把 切面 和 目标对象 交给ioc容器管理
+         基于注解的AOP的实现：
+                1、将目标对象和切面交给IOC容器管理（注解+扫描）
+                2、开启AspectJ的自动代理，为目标对象自动生成代理
+                3、将切面类通过注解@Aspect标识
+    4.5选择注解+扫描的方式
+        注解：在CalculatorImpl和LoggerAspect用@Component注解修饰
+        扫描：在aop-annotation.xml设置<context:component-scan>
+    4.6为LoggerAspect添加注解@Aspect,将其表示为切面组件
+        因为此时LoggerAspect在ioc中就是一个普通组件，
+        但是我们目的是将其作为切面组件，因此需要注解org.aspectj.lang.annotation下面的@Aspect
+    4.7在spring配置文件中aop-annotation.xml开启基于注解的AOP的功能
+        <aop:aspectj-autoproxy/>
+    4.8在LoggerAspect实现功能：
+        设置通知方法（四种类型：前置 返回 异常 后置）：
+            需要注解表明通知方法类型
+            @Before("必须设置value(即切入点表达式)")
+                例子：将前置通知作用于目标对象CalculatorImpl的add方法上的格式：
+                        @Before("execution(public int com.atguigu.spring.aop.annotation.CalculatorImpl.add(int,int))")
+                        public void beforeLLL(){sout("方法执行前")}
+    4.9测试一下4.8的前置方法
+        注意：与之前的getBean不一样，我们不能使用ioc.getBean(CalculatorImpl.class)  //NoSuchBeanDefinitionException
+        异常原因:
+            我们在spring配置文件中扫描（注解+扫描）了,但是我们使用了aop，因此我们必须使用代理对象来访问我们的目标对象。
+            而不是通过上面直接访问目标对象CalculatorImpl。
+
+            即：我们无法通过ioc获取被代理的目标对象，只能通过访问代理类来间接访问目标类
+
+        分析：
+            如何寻找代理对象的代理类，向上转型（使用目标对象的父类或者接口）
+                Calculator cal = ioc.getBean(Calculator.class);
+                cal.add(1,2);
+
+    4.10切入点表达式的修改
+        目前的前置方法：beforeLLL只能用在add方法中，如果将其通用化
+        解决：
+            修改·切入点表达式·的
+            a.@Before("execution(* com.atguigu.spring.aop.annotation.CalculatorImpl.*())")
+            b.@Before("execution(* com.atguigu.spring.aop.annotation.CalculatorImpl.*(..))")
+
+                解释：
+                    第一个*:表示不在乎访问权限和返回值类型
+                    第二个*:表示将给前置方法应用到该类下所有的方法,其中a格式表示无参的方法，b格式表示任意参数列表
+                    下面c的格式的第二个*:当前包下所有的类
+            c.@Before("execution(* com.atguigu.spring.aop.annotation.*.*(..))")
+
+    4.11为前置方法增加参数JoinPoint参数，获取连接点所对应的方法的信息
+
+            1.获取连接点所对应的方法的签名信息：getSignature()
+                签名信息就是声明信息,例如：public void add(int a,int b)
+            2.获取连接点所对应的方法的方法名：  getSignature().getName()
+            3.获取连接点所对应的方法的参数列表：getArgs() -->Object[] args
+            4.获取方法的返回值：proceed()
+         ----------------------------------------
+        @Before("execution(public int com.atguigu.spring.aop.annotation.CalculatorImpl.add(int,int))")
+        public void beforeLLL(JoinPoint joinPoint){
+            1)Signature signature = joinPoint.getSignature();
+            2)String methodName = joinPoint.getSignature().getName();
+            3)String args = Arrays.toString(joinPoint.getArgs());
+            4)joinPoint.proceed();
+        }
+
+    4.12切入点表达式的重用，设置一次，不用来回复制粘贴
+
+        - 声明一个公共的切入点表达式
+            @Pointcut("execution(* com.atguigu.aop.annotation.*.*(..))")
+            public void pointCut(){}
+
+        - 使用：
+             @Before("pointcut()")
+             public void beforeLLL(JoinPoint joinPoint){
+                ....
+             }
+    4.13其他各种通知的使用
+         1、在切面中，需要通过指定的注解将方法标识为通知方法
+         * @Before：前置通知，在目标对象方法执行之前执行
+         * @After：后置通知，在目标对象方法的finally字句中执行
+         * @AfterReturning：返回通知，在目标对象方法返回值之后执行
+         * @AfterThrowing：异常通知，在目标对象方法的catch字句中执行
+         -----------------------------------------------------------
+        1.@After("切入点表达式")是在finally中执行的                                 （后置通知），
+            JoinPoint
+
+            即使执行的方法报了异常，我们在After中加入的功能依然执行
+        2.@AfterReturning("切入点表达式")                                          （返回通知）
+            JoinPoint
+
+            在目标对象方法返回值之后执行
+            如果方法出现异常，则不会执行。
+            如何获取方法的返回值：
+                @AfterReturning(value = "pointCut()", returning = "result")
+                public void afterReturningAdviceMethod(JoinPoint joinPoint, Object result){
+                    //获取连接点所对应方法的签名信息
+                    Signature signature = joinPoint.getSignature();
+                    System.out.println("LoggerAspect，方法："+signature.getName()+"，结果："+result);
+                }
+        3.@AfterThrowing用来将通知方法的某个形参，接收目标方法的异常                    （异常通知）
+            JoinPoint
+
+            如何获取异常信息：
+                @AfterThrowing(value = "pointCut()", throwing = "ex")
+                public void afterThrowingAdviceMethod(JoinPoint joinPoint, Throwable ex){
+                        //获取连接点所对应方法的签名信息
+                        Signature signature = joinPoint.getSignature();
+                        System.out.println("LoggerAspect，方法："+signature.getName()+"，异常："+ex);
+                    }
+        4.@Around("pointCut()")                                                                    （环绕通知）
+             - 通知方法的参数不是JoinPoint而是ProceedingJoinPoint（可执行的连接点的对象）
+             - proceedingJoinPoint.proceed() //表示目标对象方法的执行
+             - 必须有返回值（return proceed得到的结果）
+             - 环绕通知的方法的返回值一定要和目标对象方法的返回值一致
+
+             @Around("pointCut()")
+                //
+                public Object aroundAdviceMethod(ProceedingJoinPoint joinPoint){
+                    Object result = null;
+                    try {
+                        System.out.println("环绕通知-->前置通知");
+                        //表示目标对象方法的执行
+                        result = joinPoint.proceed();
+                        System.out.println("环绕通知-->返回通知");
+                    } catch (Throwable throwable) {
+                        throwable.printStackTrace();
+                        System.out.println("环绕通知-->异常通知");
+                    } finally {
+                        System.out.println("环绕通知-->后置通知");
+                    }
+                    return result;
+                }
+        --------------------------------------------------------------
+5.关于AfterReturning的属性
+    5.1 returning属性值：将·通知方法的某个参数·指定为·接收目标对象方法的返回值的参数·
+        分析：因为AfterReturning是在目标对象方法返回值之后执行，因此已经的到来返回值，这里我们使用这个返回值（就是将结果赋给returning对应的参数）
+        要求通知方法有一个参数Object paramName，而returning的值就是"paramName"
+    @AfterReturning(value = "execution(* com.atguigu.aop.annotation.CalculatorImpl.*(..))", returning = "result")
+    public void afterReturningMethod(JoinPoint joinPoint, Object result){
+        String methodName = joinPoint.getSignature().getName();
+        System.out.println("Logger-->返回通知，方法名："+methodName+"，结果："+result);
+    }
+
+6.四种通知执行顺序
+    - Spring版本5.3.x以前：
+        - 前置通知
+        - 目标操作
+        - 后置通知
+        - 返回通知或异常通知
+    - Spring版本5.3.x以后（包括该版本）：
+        - 前置通知
+        - 目标操作
+        - 返回通知或异常通知
+        - 后置通知
+7.总结用到的注解
+    1.@Component
+    2.@Aspect //将当前组件标识为切面
+    3.@Pointcut("切入点表达式")，pointCut()是其修饰的方法，无参，函数体内容也为空
+    4.@Before("pointCut()")
+    5.@After("pointCut()")
+    6.@AfterReturning(value = "pointCut()", returning = "result")
+    7.@AfterThrowing(value = "pointCut()", throwing = "ex")
+    8.@Around("pointCut()")
+
+8.切面的优先级（以ValidateAspect验证功能切面为例）
+    1.相同目标方法上同时存在多个切面时，切面的优先级控制切面的**内外嵌套**顺序。
+        - 优先级高的切面：外面
+        - 优先级低的切面：里面
+
+    2.使用@Order注解可以控制切面的优先级：（☆☆☆☆☆）
+        可以通过@Order注解的value属性设置优先级，默认值Integer的最大值，@Order注解的value属性值越小，优先级越高
+        - @Order(较小的数)：优先级高
+        - @Order(较大的数)：优先级低
+        例如：
+            @Component
+            @Aspect
+            @Order(1)
+            public class ValidateAspect {
+                //@Before("execution(* com.atguigu.spring.aop.annotation.CalculatorImpl.*(..))")
+                @Before("com.atguigu.spring.aop.annotation.LoggerAspect.pointCut()")
+                public void beforeMethod(){System.out.println("ValidateAspect-->前置通知");}
+            }
+
+------------------------------------------以上是基于注解的AOP-----------------------------------
+9.基于XML的AOP
+步骤：
+    9.1我们只需将上面关于aop的注解删除即可(以下均是aop的注解)
+        1.@Order()
+        2.@Aspect
+        3.@Pointcut
+        4.@Before
+        5.@After
+        6.@AfterReturning
+        7.@AfterThrowing
+        8.@Around
+    9.2扫描组件
+
+    9.3aop的配置<aop:config>
+        <aop:config>
+            <aop:aspect ref属性 order属性>           将ioc的某个组件(bean)设置为切面
+            <aop:advisor>                           设置当前通知（声明式事务时用）
+                <aop:pointcut           id(设置一个id)                           expression(设置切入点表达式)>
+                <aop:before             method(将代理类的该方法设置为·前置通知·)   pointcut(切入点表达式)
+                                                                                pointcut-ref(指定切入点表达式的id)
+                <aop:after              method(将代理类的该方法设置为·后置通知·)   pointcut|pointcut-ref
+                <aop:after-returning    method(将代理类的该方法设置为·返回通知·)   pointcut|pointcut-ref               returning(返回方法的参数名字)
+                <aop:after-throwing     method(将代理类的该方法设置为·异常通知·)   pointcut|pointcut-ref               throwing(异常对象Throwable的名字)
+                <aop:around             method(将代理类的该方法设置为·环绕通知·)
+        --------------配置如下：-----------
+            <context:component-scan base-package="com.atguigu.aop.xml"></context:componentscan>
+            <aop:config>
+                <!--配置切面类,ref="loggerAspect"是ioc通过注解+扫描所以可以识别-->
+                <aop:aspect ref="loggerAspect">
+                    <aop:pointcut           id="pointCut"                   expression="execution(*com.atguigu.aop.xml.CalculatorImpl.*(..))"/>
+                    <aop:before             method="beforeMethod"           pointcut-ref="pointCut"></aop:before>
+                    <aop:after              method="afterMethod"            pointcut-ref="pointCut"></aop:after>
+                    <aop:after-returning    method="afterReturningMethod"   returning="result"              pointcut-ref="pointCut"></aop:after-returning>
+                    <aop:after-throwing     method="afterThrowingMethod"    throwing="ex"                   pointcut-ref="pointCut"></aop:after-throwing>
+                    <aop:around             method="aroundMethod"           pointcut-ref="pointCut"></aop:around>
+                </aop:aspect>
+
+                <aop:aspect ref="validateAspect" order="1">
+                    <aop:before method="validateBeforeMethod" pointcut-ref="pointCut">
+                    </aop:before>
+                </aop:aspect>
+            </aop:config>
+
+10.异常  org.springframework.aop.AopInvocationException:
+        Null return value from advice does not match primitive return type for:
+        public abstract int com.atguigu.spring.aop.annotation.Calculator.div(int,int)
+
+        - 这是因为我们的代理：就是LoggerAspect下对应的环绕通知方法的没有设置返回值
+
+11.再使用xml配置时如果，加入的功能不能预期出现，可能是切入点表达式有问题
+例如：
+    正确：<aop:pointcut id="pointCut" expression="execution(* com.atguigu.spring.aop.annotation.CalculatorImpl.*(..)))"></aop:pointcut>
+         <aop:pointcut id="pointCut" expression="execution(* com.atguigu.spring.aop.*.*.*(..)))"></aop:pointcut>
+    错误：
+         <aop:pointcut id="pointCut" expression="execution(* com.atguigu.spring.aop.*.*(..)))"></aop:pointcut>
+
+
+
+------------------------------------------AOP的重要应用：声明式应用-----------------------------------
+10.声明式应用
+
+

@@ -1,0 +1,212 @@
+1.新的maven项目配置
+1.1 porn.xml
+1.2 copy log4j.xml和jdbc.properties文件
+1.3 utils工具类的复制
+
+1.4新建mybatis-config核心配置文件
+    （typeAliases和mappers内部的package）
+1.5之后新建包然后建立mapper的java类其实就是DAO
+1.6建立与其对应的xml文件
+1.7建立pojo等包即可
+
+注意：
+ 1.新建的mybatis-mapper.xml命名空间一定要自己的mapper类
+ 2.mapper类与对应的mapper.xml文件名字必须一致
+ 3.创建后的的maven模块尽量不要修改名字，如果修改不好，构建项目时无法解析对应的xml文件
+
+------------------
+1.字段名与属性名不一致时如何处理映射关系？
+- 方法1：在原来的JDBC中，我们在sql语句处将属性名设置为数据库对应列的别名）
+- 方法2：当sql数据库字段名符合命名要求（使用下划线），java类符合要去使用驼峰，我们
+        可以在mybatis的核心配置文件中设置一个全局配置，可以自动将下划线映射为驼峰
+        形式：emp_id --> empId
+        使用<setting>标签
+            <settings>
+                <!--mapUnderscoreToCamelCase：将下划线映射为驼峰-->
+                <setting name="mapUnderscoreToCamelCase" value="true"/>
+                <!--开启延迟加载（针对分布查询的） -->
+                <setting name="lazyLoadingEnabled" value="true"/>
+                <!--按需加载（开启延迟加载的必须条件，默认为false）-->
+                <setting name="aggressiveLazyLoading" value="false"/>
+            </settings>
+
+            <select id="getEmpByID" resultType="emp">
+                    select * from t_emp where emp_id=#{empId}
+            </select>
+- 方法3：resultMap设置自定义映射
+    此时我们在sql对应的标签中不在使用属性resultType而是resultMap
+    resultType的值是一个具体的类型（通过typeAliases还可以使用类型别名）
+    resultMap的值是resultmap的id
+
+        <resultMap id="empResultMap" type="emp">
+            <id column="emp_id" property="empId"></id>
+            <result column="emp_name" property="empName"></result>
+            <result column="age" property="age"></result>
+            <result column="gender" property="gender"></result>
+        </resultMap>
+        <select id="getEmpByID" resultMap="empResultMap">
+          select * from t_emp where emp_id=#{empId}
+        </select>
+
+2.resultMap标签（☆☆☆☆☆）
+其内部常用的四个标签是：
+    1. id(处理主键)
+    2. collection(处理一对多)
+    3. association(处理多对一)(处理实体类类型的属性)
+    4. result(处理普通字段)
+
+3.多对一映射处理
+解释：
+    例如该次实验的两个表：t_emp(员工表) 和 t_dept(部门表)
+    一个部门可以有多个员工，在sql中t_emp通过字段dept_id说明自己的部门
+    但是在java的实体类中如何表明Emp和Dept对象之间的关系？
+    （在实际阶段中，我们不会将dept_id字段设置为Emp实体类的属性，而是为Emp设置一个Dept对象属性）
+描述：
+    1.在Emp类中加入一个属性Dept dept
+    2.我们按照原来的方式使用resultType进行查询，
+        由于Emp类的属性是Dept dept对象，而t_emp中是dept_id（int）
+        因此查询结果dept为null：Emp{empId=1, empName='张三', age=12, gender='男', dept=null}
+    3.我们要做的是拿着查询结果中dept_id与Dept dept的属性进行映射，而不是将一个int类型映射给Java对象
+    <!--Emp getEmpAndDeptByEmpId(@Param("empId") Integer empId);-->
+        <select id="getEmpAndDeptByEmpId" resultType="emp">
+            select e.*,d.*
+            from t_emp e join t_dept d
+            on e.dept_id=d.dept_id
+            where e.emp_id=#{empId}
+        </select>
+
+3.1处理多对一映射的三种方法
+- 1.级联方式
+   （全部依赖resultMap的id和result标签）
+        <resultMap id="EmpAndDeptResultMap" type="emp">
+            <id column="emp_id" property="empId"></id>
+            <result column="emp_name" property="empName"></result>
+            <result column="age" property="age"></result>
+            <result column="gender" property="gender"></result>
+            <result column="dept_id" property="dept.deptId"></result>
+            <result column="dept_name" property="dept.deptName"></result>
+        </resultMap>
+        <select id="getEmpAndDeptByEmpId" resultMap="EmpAndDeptResultMap">
+            select e.*,d.*
+            from t_emp e join t_dept d
+            on e.dept_id=d.dept_id
+            where e.emp_id=#{empId}
+        </select>
+- 2.association(处理多对一)(处理实体类类型的属性)
+       property:设置需要处理映射关系的属性的属性名
+       javaType：设置要处理的属性的类型
+
+    <resultMap id="EmpAndDeptResultMapOne" type="emp">
+        <id column="emp_id" property="empId"></id>
+        <result column="emp_name" property="empName"></result>
+        <result column="age" property="age"></result>
+        <result column="gender" property="gender"></result>
+        <association property="dept" javaType="Dept">
+            <!--javaType="Dept" Dept是别名，因为我们使用了typeAliases-->
+            <id column="dept_id" property="deptId"></id>
+            <result column="dept_name" property="deptName"></result>
+        </association>
+    </resultMap>
+    select同上，把resultMap换了即可
+
+- 3.分布查询（可以处理一对多、多对一）
+    第1步（在EmpMapper.xml中写）：先查询t_emp中数据，select * from t_emp where emp_id=#{empId}
+        该结果中包含dept_id，这个属性作为第二步的已知条件
+    第2步（在DeptMapper.xml中写）：select * from t_dept where dept_id=#{deptId}
+        其中作为条件的dept_id来自第一步获取结果的一列
+    第3步：调用在EmpMapper声明第一步骤方法即可（第二步骤会自动调用）
+    注意：将第1步的结果用于第2步需要使用association标签三个属性的：
+        1.property ：处理的Java对象的属性（Empt empt.dept）
+        2.select ：第二步将要执行的sql语句的唯一标识）
+        3.column ：第一步获取的列dept_id将其作为第二步进行的条件
+        4.fetchType：在开启了延迟加载的环境中，通过该属性设置当前的分布查询是否使用延迟加载
+
+
+      1.
+        <resultMap id="EmpAndDeptByStepResultMapThree" type="emp">
+            <id column="emp_id" property="empId"></id>
+            <result column="emp_name" property="empName"></result>
+            <result column="age" property="age"></result>
+            <result column="gender" property="gender"></result>
+            <association
+                    property="dept"
+                    select="com.atguigu.mybatis.mapper.DeptMapper.getEmpAndDeptByStepTwo"
+                    column="dept_id"></association>
+        </resultMap>
+        <select id="getEmpAndDeptByStep" resultMap="EmpAndDeptByStepResultMapThree">
+            select * from t_emp where emp_id=#{empId}
+        </select>
+      2.方法定义在自己类对应的Mapper类中
+        <!--Dept getEmpAndDeptByStepTwo(@Param("deptId") Integer deptId);-->
+        <select id="getEmpAndDeptByStepTwo" resultType="dept">
+            select * from t_dept where dept_id=#{deptId}
+        </select>
+4.开启延迟加载lazyLoadingEnabled和aggressiveLazyLoading
+    是分布查询就可以使用延迟加载
+    1. 对于全局的设置，我们将下面代码设置在核心配置文件中即可
+            <settings>
+                <!--mapUnderscoreToCamelCase：将下划线映射为驼峰-->
+                <setting name="mapUnderscoreToCamelCase" value="true"/>
+                <!--开启延迟加载-->
+                <setting name="lazyLoadingEnabled" value="true"/>
+                <!--按需加载-->
+                <setting name="aggressiveLazyLoading" value="false"/>
+            </settings>
+    2.如果我们在全局开启了延迟加载但是想让某个sql查询立即加载，我们可以通过association的fetchType
+        其取值有：
+                eager(立即加载)
+                lazy(延迟加载)
+
+5.一对多映射处理
+描述：例如对于类Dept，我们可以设置一个属性List<Emp>表示一个部门有多个员工
+
+5.1 处理一对多映射（两种方式）
+- 1.collection
+- 2.分布查询
+
+    1.collection（处理集合类型的属性）
+        ofType:是获取集合类型中的属性中存储的数据类型
+     <!--Dept getDeptAndEmpByDeptId(@Param("deptId") Integer deptId);-->
+        <resultMap id="DeptAndEmpByStepResultMap" type="dept">
+            <id column="dept_id" property="deptId"></id>
+            <result column="dept_name" property="deptName"></result>
+            <collection property="emps" ofType="emp">
+                <id column="emp_id" property="empId"></id>
+                <result column="emp_name" property="empName"></result>
+                <result column="age" property="age"></result>
+                <result column="gender" property="gender"></result>
+            </collection>
+        </resultMap>
+        <!--sql查询的类有：dept_id dept_name emp_id emp_name age gender dept_id-->
+        <select id="getDeptAndEmpByDeptId" resultMap="DeptAndEmpByStepResultMap">
+            SELECT t_dept.* , t_emp.*
+            FROM t_dept JOIN t_emp
+            ON t_dept.`dept_id`=t_emp.`dept_id`
+            WHERE t_dept.`dept_id`=#{deptId};
+        </select>
+
+    2.分布查询(仍然需要collection)
+    <!--Dept getDeptAndEmpByStepFirst(@Param("deptId") Integer deptId);-->
+        <resultMap id="DeptAndEmpByStepResultMap" type="dept">
+            <id column="dept_id" property="deptId"></id>
+            <result column="dept_name" property="deptName"></result>
+            <collection property="emps"
+                         select="com.atguigu.mybatis.mapper.EmpMapper.getDeptAndEmpByStep"
+                         column="dept_id"></collection>
+        </resultMap>
+        <select id="getDeptAndEmpByStepFirst" resultMap="DeptAndEmpByStepResultMap">
+            select * from t_dept where dept_id=#{deptId}
+        </select>
+
+6.标签总结
+    resultMap：设置自定义的映射关系
+    id：唯一标识
+    type：处理映射关系的实体类的类型
+
+    常用的标签：
+    id：处理主键和实体类中属性的映射关系
+    result：处理普通字段和实体类中属性的映射关系
+    association：处理多对一的映射关系（处理实体类类型的属性）
+    collection：处理一对多的映射关系（处理集合类型的属性）
+    column：设置映射关系中的字段名，必须是sql查询出的某个字段
+    property：设置映射关系中的属性的属性名，必须是处理的实体类类型中的属性名

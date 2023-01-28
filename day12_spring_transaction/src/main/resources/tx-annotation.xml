@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context" xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd">
+
+    <!--4.扫描-->
+    <context:component-scan base-package="com.atguigu.spring"></context:component-scan>
+
+    <!--3.1引入properties文件-->
+    <!--<context:property-placeholder location="jdbc.properties"></context:property-placeholder>-->
+    <!--在web工程中，有两个路径，因此那时我们就必须设置classpath(推荐这个方式)-->
+    <context:property-placeholder location="classpath:jdbc.properties"/>
+
+    <!--2.1通过ioc容器管理数据源-->
+    <!--3.需要将properties文件引入-->
+    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
+        <property name="url" value="${jdbc.url}"></property>
+        <property name="driverClassName" value="${jdbc.driver}"></property>
+        <property name="username" value="${jdbc.username}"></property>
+        <property name="password" value="${jdbc.password}"></property>
+    </bean>
+    <!--1.外部jar包使用xml注解：使用JdbcTemplate-->
+    <bean class="org.springframework.jdbc.core.JdbcTemplate">
+        <!--2.提供连接，用于连接数据库-->
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+
+    <!--5.事务管理器-->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"></property>
+    </bean>
+
+    <!--6.事务的注解驱动-->
+    <tx:annotation-driven transaction-manager="transactionManager"></tx:annotation-driven>
+</beans>

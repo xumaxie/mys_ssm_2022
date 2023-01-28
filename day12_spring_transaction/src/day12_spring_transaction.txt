@@ -1,0 +1,311 @@
+1. 关于spring-orm
+    <!-- Spring 持久化层支持jar包 -->
+    <!-- Spring 在执行持久化层操作、与持久化层技术进行整合过程中，需要使用orm、jdbc、tx三个jar包 -->
+    <!-- 导入 orm 包就可以通过 Maven 的依赖传递性把其他两个也导入 -->
+    tx就是表示操作事务的
+    orm：对象关系映射
+2.JdbcTemplate（类）
+    Spring 框架对 JDBC 进行封装，使用 JdbcTemplate 方便实现对数据库操作
+3.操作流程
+ - 1.加入依赖
+ - 2.mysql连接的properties配置文件
+ - 3.配置Spring的配置文件
+        <!--3.1引入properties文件-->
+        <!--<context:property-placeholder location="jdbc.properties"></context:property-placeholder>-->
+        <!--在web工程中，有两个路径，因此那时我们就必须设置classpath(推荐这个方式)-->
+        <context:property-placeholder location="classpath:jdbc.properties"/>
+
+        <!--2.1通过ioc容器管理数据源-->
+            <!--3.需要将properties文件引入-->
+        <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
+            <property name="url" value="${jdbc.url}"></property>
+            <property name="driverClassName" value="${jdbc.driver}"></property>
+            <property name="username" value="${jdbc.username}"></property>
+            <property name="password" value="${jdbc.password}"></property>
+        </bean>
+        <!--1.外部jar包使用xml注解：使用JdbcTemplate-->
+        <bean class="org.springframework.jdbc.core.JdbcTemplate">
+            <!--2.提供连接，用于连接数据库-->
+            <property name="dataSource" ref="dataSource"></property>
+        </bean>
+ - 4.测试（本次使用的spring整合的junit4版本，如果是junit5下面使用的注解不同）
+    - 关于spring-test(spring整合的junit的依赖)
+        其可以让测试类在spring的测试环境中执行，此时就不需要每次获取ioc容器（new  ClassPathXMLApplicationContext("spring配置的.xml")）
+        可以通过DI（依赖注入）的方式来获取ioc容器中的某个bean
+    - 两个必须的注解：
+        @RunWith(SpringJUnit4ClassRunner.class)             //使用DI的方式获取ioc容器中的某个bean
+        @ContextConfiguration("classpath:spring-jdbc.xml")  //设置spring测试环境的配置文件（classpath指得是类路径）
+ - 5.说明JdbcTemplate不咋用，作为了解，主要是使用mybatis
+ - 6.JdbcTemplate简单入门使用
+    @RunWith(SpringJUnit4ClassRunner.class)
+    @ContextConfiguration("classpath:spring-jdbc.xml")
+    public class JdbcTemplateTest {
+
+    //    DI依赖注入的方式有多种，我们使用自动装配
+        @Autowired
+        private JdbcTemplate jdbcTemplate;
+
+        @Test
+        public void testUnpdat(){
+            String sql = "insert into t_user values(null,?,?,?,?,?)";
+            jdbcTemplate.update(sql,"kk","123abc",45,"女","456@163.com");
+            System.out.println();
+        }
+
+        @Test
+        public void testSelectById(){
+            String sql ="select * from t_user where id=?";
+            //jdbcTemplate.queryForObject
+    //            //BeanPropertyRowMapper
+            User user = jdbcTemplate.queryForObject(sql, new BeanPropertyRowMapper<>(User.class), 1);
+            System.out.println(user);
+        }
+
+        @Test
+        public void testGetAlluser(){
+            String sql ="select * from t_user";
+            //jdbcTemplate.query
+    //            //BeanPropertyRowMapper
+            List<User> query = jdbcTemplate.query(sql, new BeanPropertyRowMapper<>(User.class));
+            query.forEach(System.out::println);
+        }
+
+        @Test
+        public void testSpecialQuery(){
+            String sql="select count(*) from t_user";
+
+            //jdbcTemplate.queryForObject(String sql, Class<T> requiredType)
+            //jdbcTemplate.queryForObject(String sql, Class<T> requiredType,args)
+            /**
+             * class<T>是指返回值的类型
+             * args是指占位符的赋值
+             */
+            Integer integer = jdbcTemplate.queryForObject(sql, Integer.class);
+            System.out.println(integer);
+        }
+    }
+
+4.声明式事务概念
+ 4.1 编程式事务：**自己写代码**实现功能
+ 事务功能的相关操作全部通过自己编写代码
+    - 例如：使用try-catch-finally实现是否自动提交，设置不自动提交，出现异常进行collback，如果无异常则commit等
+
+    - 编程式的实现方式存在缺陷：
+    - 细节没有被屏蔽(全部人工)
+    - 代码复用性不高
+
+ - 因此我们需要引入aop切面来实现
+
+ 4.2声明式事务：通过配置让框架实现功能
+ - 我们只需将通知方法作用到连接点
+ 事务控制的代码有规律可循，代码的结构基本是确定的，所以框架就可以将固定模式的代码抽取出来，进行相关的封装。
+    好处
+         - 提高开发效率
+         - 消除了冗余的代码
+         - 框架的代码考虑方面更多（健壮性、性能），比个人写的更优秀
+
+ 4.3spring中基于注解的声明式事务（tx-annotation.xml）
+    4.3.2总结：声明式事务的配置步骤：
+         * 1、在Spring的配置文件中配置事务管理器
+         * 2、开启事务的注解驱动
+             * 在需要被事务管理的方法上，添加@Transactional注解，该方法就会被事务管理
+             * @Transactional注解标识的位置：
+                 * 1、标识在方法上
+                 * 2、标识在类上，则类中所有的方法都会被事务管理
+    4.3.1实验步骤：
+        1.导入依赖
+        2.spring的配置文件
+        3.设置数据库的表（t_book t_user）
+         t_book
+            `book_id` int(11)       非空 自增 主键
+            `book_name` varchar(20) 默认值为null
+            `price` int(11)         默认值为null
+            `stock` int(10)         无符号 默认值为null,
+         t_user
+            `user_id` int(11)       非空 自增 主键
+            `username` varchar(20)  默认值为null
+            `balance` int(10)       无符号 默认值为null,
+            ------------------------------
+         分析问题：
+            用户买书：先查询price,然后更新库存stock，然后修改用户的balance余额
+            可能出现的问题：
+                stock不足
+                balance不足
+            解决思想：
+                1.数据库层面：通过设置字段的属性，例如：stock和balance的unsigned,通过sql的报错解决问题
+                2.java代码层面：我们可以设置自定义异常判断
+        4.创建组件（使用注解+扫描，自动装配）
+            controller service(impl) dao(impl)
+
+            @Controller
+            @Service
+            @Repository
+
+        5.测试:无事务情况
+            创建测试类
+                    @RunWith(SpringJUnit4ClassRunner.class)
+                    @ContextConfiguration("classpath:tx-annotation.xml")
+                    public class TxByAnnotationTest {
+
+                        @Autowired
+                        private BookController bookController;
+                        @Test
+                        public void testBuyBook(){
+                            bookController.buyBook(1, 1);
+                        }
+                    }
+            模拟场景
+                自动提交默认开启时，如果我们没有添加事务就会出现库存减少，客户余额不变
+            观察结果
+                因此需要事务管理
+        6.测试:有事务情况（spring提供了事务管理的切面：事务管理器）
+            ①添加事务配置
+                操作：
+                    a.配置事务管理器
+                        class的选择（必须是类）：DataSourceTransactionManager(类)《---TransactionManager（接口）
+                        配置：
+                            <bean id="transactionManager"
+                                  class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+                                <property name="dataSource" ref="dataSource"></property>
+                            </bean>
+                    b.开启事务的注解驱动：
+                        - 通过注解@Transactional所标识的方法或标识的类中所有的方法，都会被事务管理器管理事务
+                        - 配置：
+                            <tx:annotation-driven transaction-manager="transactionManager" />
+                        - 注意：
+                            ！tx后有好几个annotation-drive，要选对（tx）
+                            ！transaction-manager属性的默认值是transactionManager，
+                              如果事务管理器bean的id正好就是这个默认值，则可以省略这个属性
+            ②添加事务注解：@Transactional
+                因为service层表示业务逻辑层，一个方法表示一个完成的功能，因此处理事务一般在service层处理
+                在BookServiceImpl的buybook()添加注解@Transactional（或者直接添加在BookServiceImpl类上）
+            ③观察结果
+
+    4.3.3@Transactional注解标识的可使用的位置
+            方法
+            类
+
+    4.3.4事务属性
+      如果只写@Transactional代表各种属性都是默认值，也可以通过一下属性自定义值
+         readOnly:                      true false
+         timeout:                       时间
+         rollbackFor:                   class对象
+             rollbackForClassName：     全类名
+             noRollbackFor
+             noRollbackForClassName
+         isolation（一般使用默认值）:     Isolation.DEFAULT |
+                                        Isolation.READ_UNCOMMITTED | Isolation.READ_COMMITTED
+                                        Isolation.REPEATABLE_READ | Isolation.SERIALIZABLE
+
+         propagation:                   Propagation.REQUIRED | Propagation.REQUIRES_NEW
+         ----------------------------------------------------------------------------------------
+        1.事务属性：只读
+            - 对一个查询操作来说，如果我们把它设置成只读，就能够明确告诉数据库，这个操作不涉及写操作。这样数据库就能够针对查询操作来进行优化。
+            - 使用方式：
+                @Transactional(readOnly = true)
+                   如果出现修改等操作，则会报错：Caused by: java.sql.SQLException: Connection is read-only. Queries leading to data modificationare not allowed
+
+        2.事务属性：超时
+            - 超时回滚（Java程序或MySQL数据库或网络连接），释放资源
+            - 使用方式：
+                @Transactional(timeout = 3)
+                   若超时则抛出：org.springframework.transaction.TransactionTimedOutException
+
+        3.事务属性：回滚策略
+            声明式事务默认只针对运行时异常回滚，编译时异常不回滚。
+            - rollbackFor属性：需要设置一个Class类型的对象                (一般不设置)
+            - rollbackForClassName属性：需要设置一个字符串类型的全类名     (一般不设置)
+            - noRollbackFor属性：需要设置一个Class类型的对象              (设置)
+            - noRollbackForClassName属性：需要设置一个字符串类型的全类名   (设置)
+
+            - 使用方式:
+                @Transactional(noRollbackFor = {ArithmeticException.class}) //由于只有一个元素，数组‘{}’可以不加
+                @Transactional(noRollbackForClassName = "java.lang.ArithmeticException")
+        4.事务属性：事务隔离级别
+            - 隔离级别越高，数据一致性就越好，但并发性越弱。
+            - 四种隔离级别：
+              a- 读未提交：READ UNCOMMITTED：  允许Transaction01读取Transaction02未提交的修改。
+              b- 读已提交：READ COMMITTED：    要求Transaction01只能读取Transaction02已提交的修改。
+              c- 可重复读：REPEATABLE READ：   确保Transaction01可以多次从一个字段中读取到相同的值，
+                      mysql默认c                 即Transaction01执行期间·禁止其它事务对这个字段进行更新·。
+              d- 串行化：SERIALIZABLE：        确保Transaction01可以多次从一个表中读取到相同的行，
+                                                在Transaction01执行期间，·禁止其它事务对这个表·进行添加、更新、删除操作。
+                                                可以避免任何并发问题，但性能十分低下。
+           - 使用方式：
+                @Transactional(isolation = Isolation.DEFAULT)//使用数据库默认的隔离级别
+                @Transactional(isolation = Isolation.READ_UNCOMMITTED)//读未提交
+                @Transactional(isolation = Isolation.READ_COMMITTED)//读已提交
+                @Transactional(isolation = Isolation.REPEATABLE_READ)//可重复读
+                @Transactional(isolation = Isolation.SERIALIZABLE)//串行化
+
+        5.事务属性：事务传播行为
+            propagation(传播)属性设置事务传播行为
+            当事务方法被另一个事务方法调用时，必须指定事务应该如何传播。
+            例如：方法可能继续在现有事务中运行，也可能开启一个新事务，并在自己的事务中运行。
+
+            checkout功能:两本书，每买一本书都会出现一个buyBook事务，两本书就是执行两次
+                    此时checkout和两个buyBook都有各自的事务，此时应该用谁的事务
+                        假设使用checkout的事务，此时如果有一本书买不成，呢么另外一本也肯定买不成
+                        假设使用buyBook的事务，会出现一本可能买成功了，另一本买失败了。
+             实验：
+                - BookController中(@Autowired)
+                        buyBook(Integer userId,Integer bookId)
+                        checkout(Integer userId,Integer[] bookIds)
+                - CheckoutService(Impl)(@Service\@Autowired)(记着是在service层加事务@Transactional(各种事务属性))
+                        checkout(Integer userId,Integer[] bookIds)
+                - 实现中如果不修改事务的传播行为则默认是使用checkout的事务,
+                - 修改BookServiceImpl中buyBook()上，注解@Transactional的propagation属性
+                  - @Transactional(propagation = Propagation.REQUIRED)，
+                    默认情况，表示如果当前线程上有已经开启的事务可用，那么就在这个事务中运行。
+                    经过观察，购买图书的方法buyBook()在checkout()中被调用，checkout()上有事务注解，
+                    因此在此事务中执行。所购买的两本图书的价格为80和50，而用户的余额为100，
+                    因此在购买第二本图书时余额不足失败，导致整个checkout()回滚，即只要有一本书买不了，就都买不了
+                  - @Transactional(propagation = Propagation.REQUIRES_NEW)，
+                    表示不管当前线程上是否有已经开启的事务，都要开启新事务。
+                    同样的场景，每次购买图书都是在buyBook()的事务中执行，因此第一本图书购买成功，
+                    事务结束，第二本图书购买失败，只在第二次的buyBook()中回滚，购买第一本图书不受影响，即能买几本就买几本
+   ------------------------------------------------------------------------------------------------------------
+
+
+ 4.4spring中基于XML的声明式事务
+    - tx:advice标签：配置事务通知
+        id属性：给事务通知标签设置唯一标识，便于引用
+        transaction-manager属性：关联事务管理器
+        <tx:attributes>
+            tx:method标签：配置具体的事务方法
+                 name属性：指定方法名，可以使用星号代表多个字符，但是与方法命名有关
+                 read-only属性：设置只读属性
+                 rollback-for属性：设置回滚的异常
+                 no-rollback-for属性：设置不回滚的异常
+                 isolation属性：设置事务的隔离级别
+                 timeout属性：设置事务的超时属性
+                 propagation属性：设置事务的传播行为
+    - aop:config
+        属性advice-ref
+        属性pointcut
+    -------------------------------------------------------------------------
+    - 修改Spring配置文件
+        1.将Spring配置文件中去掉(开启事务的注解驱动)tx:annotation-driven 标签，
+        2.并添加配置：
+            <!-- tx:advice标签：配置事务通知 -->
+            <tx:advice id="txAdvice" transaction-manager="transactionManager">
+                <tx:attributes>
+                    <tx:method name="*" read-only="true"/>
+                    <tx:method name="get*" read-only="true"/>
+                    <tx:method name="query*" read-only="true"/>
+                    <tx:method name="find*" read-only="true"/>
+                    <tx:method name="save*" read-only="false" rollback-for="java.lang.Exception" propagation="REQUIRES_NEW"/>
+                    <tx:method name="update*" read-only="false" rollback-for="java.lang.Exception" propagation="REQUIRES_NEW"/>
+                    <tx:method name="delete*" read-only="false" rollback-for="java.lang.Exception" propagation="REQUIRES_NEW"/>
+                </tx:attributes>
+            </tx:advice>
+
+            <aop:config>
+                <!-- 配置事务通知和切入点表达式 -->
+                <aop:advisor advice-ref="txAdvice" pointcut="execution(* com.atguigu.spring.tx.xml.service.impl.*.*(..))"></aop:advisor>
+            </aop:config>
+
+
+
+
+

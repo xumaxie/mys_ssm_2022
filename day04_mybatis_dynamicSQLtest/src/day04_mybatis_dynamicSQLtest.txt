@@ -1,0 +1,239 @@
+
+
+1.动态SQL目的
+    解决拼接SQL语句字符串时的痛点问题
+    其本质就是我们在mapper.xml中标签select下的一些字标签
+
+        1.if
+        2.where
+        3.trim
+        4.choose when otherwise
+        5.foreach
+        6.SQL片段
+2.实际应用中出现的问题：
+    1.例如网页上给出的关键字搜索或者单选复选框，这些给服务器的返回值作为sql的查询条件
+        有两个特殊值：
+        1. null:当没有操作，但是服务器却获取到文本框的值，此时就是null
+        2.''(空字符串):当用户操作本文框后如果文本框为空，则返回的就是空字符串
+    2.还有在动态的sql中对于关键字的处理，满足条件可能才会加上where，不满足就不会出现where关键字
+    3.and的位置，如果还有后续条件，需要加and，否则就不需要加and
+    示例问题代码：
+        <select id="getEmpByConditionOne" resultType="Emp">
+            select * from t_emp where
+            <if test="empName != null and empName != ''">
+                emp_name = #{empName}
+            </if>
+            <if test="age != null and age != ''">
+                and age = #{age}
+            </if>
+            <if test="gender != null and gender != ''">
+                and gender = #{gender}
+            </if>
+        </select>
+    针对问题2和3；
+     - 解决方法1：
+            where写在主sql语句中，
+            后面跟上1=1,
+            之后的每个if判断都加上and
+                <select id="getEmpByConditionOne" resultType="Emp">
+                    select * from t_emp where 1=1
+                    <if test="empName != null and empName != ''">
+                        and emp_name = #{empName}
+                    </if>
+                    <if test="age != null and age != ''">
+                        and age = #{age}
+                    </if>
+                    <if test="gender != null and gender != ''">
+                        and gender = #{gender}
+                    </if>
+                </select>
+      - 解决方法2：where标签自动生出where
+            where功能：
+                ①若满足条件自动生成where关键字
+                ②若有多余的and会自动消除（and是放在条件满足后内容的开头，如上或如下代码所示，
+                    对于解决方法3中的and,where去不掉就会报错）
+                ③若where标签内部没有一个满足，则不会生成where关键字
+                <select id="getEmpByConditionTwo" resultType="Emp">
+                    select * from t_emp
+                    <where>
+                        <if test="empName != null and empName != ''">
+                            emp_name = #{empName}
+                        </if>
+                        <if test="age != null and age != ''">
+                            and age = #{age}
+                        </if>
+                        <if test="gender != null and gender != ''">
+                            and gender = #{gender}
+                        </if>
+                    </where>
+                </select>
+      - 解决方法3：trim标签
+                trim有四个属性：
+                    a)prefix
+                    b)suffix
+                    c)prefixOverrides
+                    d)suffixOverrides
+
+                 解释：
+                 1.<trim prefix="where" suffixOverrides="and">
+                    意思是加上where关键字，去掉多余的and
+
+      <!--List<Emp> getEmpByCondition(Emp emp);-->
+          <select id="getEmpByCondition" resultType="Emp">
+              select * from t_emp
+              <trim prefix="where" suffixOverrides="and">
+                  <if test="empName != null and empName != ''">
+                      emp_name = #{empName} and
+                  </if>
+                  <if test="age != null and age != ''">
+                      age = #{age} and
+                  </if>
+                  <if test="gender != null and gender != ''">
+                      gender = #{gender}
+                  </if>
+              </trim>
+          </select>
+
+3.choose、when、otherwise
+下面示例是结合where标签与choose,因为when中满足一个以后其他都不会执行因此无需担心and
+    <select id="getEmpByChoose" resultType="Emp">
+        select * from t_emp
+        <where>
+            <choose>
+                <when test="empName != null and empName != ''">
+                    emp_name = #{empName}
+                </when>
+                <when test="age != null and age != ''">
+                    age = #{age}
+                </when>
+                <when test="gender != null and gender != ''">
+                    gender = #{gender}
+                </when>
+            </choose>
+        </where>
+    </select>
+
+4.foreach
+    collection：设置要循环的数组或集合
+    item：用一个字符串表示数组或集合中的每一个数据
+    separator：设置每次循环的数据之间的分隔符(insert into tablename value(),(),())
+    open：循环的所有内容以什么开始
+    close：循环的所有内容以什么结束
+    ----------------------------
+ 4.1批量添加
+    <!--int insertMoreEmp(@Param("emps") List<Emp> emps);-->
+    <insert id="insertMoreEmp">
+        insert into t_emp values
+        <foreach
+                collection="emps"
+                item="emp"
+                separator=",">
+            (null,#{emp.ename},#{emp.age},#{emp.sex},#{emp.email},null)
+        </foreach>
+    </insert>
+
+ 4.2批量删除
+ 解释：
+ 当使用in关键字时，
+    使用foreach的open="("和close=")"代表开始和结尾
+
+
+    <!--int deleteMoreByArray(@Param("empIds") Integer[] empIds);-->
+     <delete id="deleteMoreByArray">
+        delete from t_emp where
+        <foreach
+            collection="empIds"
+            item="empId"
+            separator="or">
+            emp_id = #{eid}
+        </foreach>
+     </delete>
+    -----------------
+    <!--int deleteMoreByArray(@Param("empIds") Integer[] empIds);-->
+    <delete id="deleteMoreByArray">
+        delete from t_emp where emp_id in
+        <foreach
+            collection="empIds"
+            item="eid"
+            separator=","
+            open="("
+            close=")">
+            #{eid}
+        </foreach>
+    </delete>
+    -----------------
+    <!--int deleteMoreByArray(@Param("empIds") Integer[] empIds);-->
+        <delete id="deleteMoreByArray">
+            delete from t_emp where emp_id in(
+            <foreach
+                collection="empIds"
+                item="eid"
+                separator=","
+                >
+                #{eid}
+            </foreach>
+            )
+        </delete>
+5.sql片段
+    - <sql id=>设置sql片段
+    - <include refid=>引用sql片段
+    在真正的开发中“select *”的*一般不会使用，但是查询的字段很多时，我们就可以设置一个sql片段
+    --------------------
+    <sql id="empColumns">
+        emp_id,emp_name,age,gender,dept_id
+    </sql>
+
+     <!--List<Emp> getEmpByCondition(Emp emp);-->
+        <select id="getEmpByCondition" resultType="Emp">
+            select <include refid="empColumns"></include> from t_emp
+            <trim prefix="where" suffixOverrides="and">
+                <if test="empName != null and empName != ''">
+                    emp_name = #{empName} and
+                </if>
+                <if test="age != null and age != ''">
+                    age = #{age} and
+                </if>
+                <if test="gender != null and gender != ''">
+                    gender = #{gender}
+                </if>
+            </trim>
+        </select>
+
+6.动态SQL：
+
+        1、if，通过test属性中的表达式判断标签中的内容是否有效（是否会拼接到sql中）
+        2、where
+            a.若where标签中有条件成立，会自动生成where关键字
+            b.会自动将where标签中内容前多余的and去掉，但是其中内容后多余的and无法去掉
+            c.若where标签中没有任何一个条件成立，则where没有任何功能
+        3、trim(☆☆☆)
+            prefix、suffix：在标签中内容前面或后面添加指定内容
+            prefixOverrides、suffixOverrides：在标签中内容前面或后面去掉指定内容
+        4、choose、when、otherwise
+            when、otherwise放在choose内部
+            相当于java中的if...else if...else
+            - when至少设置一个，otherwise最多设置一个
+        5、foreach
+            collection：设置要循环的数组或集合
+            item：用一个字符串表示数组或集合中的每一个数据
+            separator：设置每次循环的数据之间的分隔符
+            open：循环的所有内容以什么开始
+            close：循环的所有内容以什么结束
+        6、sql片段
+            可以记录一段sql，在需要用的地方使用include标签进行引用
+            <sql id="empColumns">
+                emp_id,emp_name,age,gender,dept_id
+            </sql>
+            <include refid="empColumns"></include>
+
+
+
+
+
+
+
+
+
+
+
+

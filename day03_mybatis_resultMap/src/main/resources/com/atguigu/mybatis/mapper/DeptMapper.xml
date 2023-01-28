@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.atguigu.mybatis.mapper.DeptMapper">
+
+
+    <!--Dept getEmpAndDeptByStepTwo(@Param("deptId") Integer deptId);-->
+    <select id="getEmpAndDeptByStepTwo" resultType="dept">
+        select * from t_dept where dept_id=#{deptId}
+    </select>
+
+    <!--Dept getDeptAndEmpByDeptId(@Param("deptId") Integer deptId);-->
+    <resultMap id="DeptAndEmpResultMap" type="dept">
+        <id column="dept_id" property="deptId"></id>
+        <result column="dept_name" property="deptName"></result>
+        <collection property="emps" ofType="emp">
+            <id column="emp_id" property="empId"></id>
+            <result column="emp_name" property="empName"></result>
+            <result column="age" property="age"></result>
+            <result column="gender" property="gender"></result>
+        </collection>
+    </resultMap>
+    <!--sql查询的类有：dept_id dept_name emp_id emp_name age gender dept_id-->
+    <select id="getDeptAndEmpByDeptId" resultMap="DeptAndEmpResultMap">
+        SELECT t_dept.* , t_emp.*
+        FROM t_dept JOIN t_emp
+        ON t_dept.`dept_id`=t_emp.`dept_id`
+        WHERE t_dept.`dept_id`=#{deptId};
+    </select>
+
+
+
+    <!--Dept getDeptAndEmpByStepFirst(@Param("deptId") Integer deptId);-->
+    <resultMap id="DeptAndEmpByStepResultMap" type="dept">
+        <id column="dept_id" property="deptId"></id>
+        <result column="dept_name" property="deptName"></result>
+        <collection property="emps"
+                     select="com.atguigu.mybatis.mapper.EmpMapper.getDeptAndEmpByStep"
+                     column="dept_id"></collection>
+    </resultMap>
+    <select id="getDeptAndEmpByStepFirst" resultMap="DeptAndEmpByStepResultMap">
+        select * from t_dept where dept_id=#{deptId}
+    </select>
+</mapper>
+

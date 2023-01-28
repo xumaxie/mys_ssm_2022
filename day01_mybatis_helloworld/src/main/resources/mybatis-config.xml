@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+
+    <!--引入properties文件，此后就可以在当前文件中使用${key}的方式访问value-->
+    <properties resource="jdbc.properties"/>
+
+    <typeAliases>
+        <!--<typeAlias type="com.atguigu.mybatis.pojo.User" alias="abc"></typeAlias>-->
+        <package name="com.atguigu.mybatis.pojo"/>
+
+    </typeAliases>
+
+    <!--environments是配置连接数据库的环境-->
+    <environments default="development">
+        <!--多个environments
+            transactionManager:事务管理器（type为JDBC）
+            dataSource：数据源内部拥有四个参数用于连接数据库
+                driver
+                url
+                username
+                password-->
+
+        <environment id="development">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <!--<property name="driver" value="${driver}"/>-->
+                <!--<property name="url" value="${url}"/>-->
+                <!--<property name="username" value="${username}"/>-->
+                <!--<property name="password" value="${password}"/>-->
+
+                <!--<property name="driver" value="com.mysql.cj.jdbc.Driver"/>-->
+                <!--<property name="url" value="jdbc:mysql://localhost:3306/ssm?serverTimezone=UTC"/>-->
+                <!--<property name="username" value="root"/>-->
+                <!--<property name="password" value="010205"/>-->
+
+                <property name="driver" value="${jdbc.driver}"/>
+                <property name="url" value="${jdbc.url}"/>
+                <property name="username" value="${jdbc.username}"/>
+                <property name="password" value="${jdbc.password}"/>
+            </dataSource>
+        </environment>
+    </environments>
+
+    <!--mappers引入mybatis的映射文件   （sql语句映射文件中）-->
+    <mappers>
+        <!--是 /不是反斜杠-->
+        <!--<mapper resource="mappers/UserMapper.xml"/>-->
+        <package name="com.atguigu.mybatis.mapper"/>
+    </mappers>
+
+</configuration>

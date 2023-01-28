@@ -1,0 +1,203 @@
+1.拦截器
+SpringMVC中的拦截器用于拦截控制器方法的执行
+- SpringMVC中的拦截器需要实现`HandlerInterceptor`
+- SpringMVC中的拦截器需要实现接口implements HandlerInterceptor
+- SpringMVC的我们设置的拦截器必须在SpringMVC的配置文件中进行配置：（因为没有类似@Controller的注解可以使用，只有使用xml配置）
+三种配置方式：
+        - 前两种配置方式都是对DispatcherServlet所处理的所有的请求进行拦截
+    - 方式1：
+        配置自己定义的拦截器
+            <mvc:interceptors>
+                拦截器是由springmvc来加载的，所以不需要我们设置id
+                <bean class="com.atguigu.interceptor.FirstInterceptor"></bean>
+            </mvc:interceptors>
+
+    - 方式2：
+        <bean id="firstInterceptor" class="com.atguigu.interceptor.FirstInterceptor（自己写的拦截器类）"></bean>
+        <mvc:interceptors>
+            <ref bean="firstInterceptor"></ref>
+        </mvc:interceptors>
+        <!--
+            以上配置方式可以通过ref或bean标签设置拦截器，
+            通过mvc:mapping设置需要拦截的请求，
+            通过mvc:exclude-mapping设置需要排除的请求，即不需要拦截的请求
+        -->
+    - 方式3：
+            <bean id="firstInterceptor" class="com.atguigu.interceptor.FirstInterceptor"></bean>
+            <mvc:interceptors>
+                <mvc:interceptor>
+                    <!--拦截的请求路径,"/*"代表在http://localhost:3306/(application context)/只有一级目录-->
+                        "/**"代表匹配所有路径
+                    <mvc:mapping path="/**"/>
+                    <!--排除的拦截路径-->
+                    <mvc:exclude-mapping path="/abc"/>
+                    <ref bean="firstInterceptor"/>
+                </mvc:interceptor>
+            </mvc:interceptors>
+
+2.拦截器的三个抽象方法（以及关于执行顺序）
+- preHandle：          控制器方法执行之前执行preHandle()，其boolean类型的返回值表示是否拦截或放行，
+                            返回true为放行，即调用控制器方法；
+                            返回false表示拦截，即不调用控制器方法
+- postHandle：         控制器方法执行之后执行postHandle()
+- afterCompletion：    处理完视图和模型数据，渲染视图完毕之后执行afterCompletion()
+
+2.1两个两个拦截器First和Second，设置两个的preHandle方法都返回true时的程序执行流程
+返回结果：
+    FirstInterceptor-->preHandle
+    SecondInterceptor-->preHandle
+    SecondInterceptor-->postHandle
+    FirstInterceptor-->postHandle
+    SecondInterceptor-->afterCompletion
+    FirstInterceptor-->afterCompletion
+
+
+    536行（DispatcherServlet）
+            if (!mappedHandler.applyPreHandle(processedRequest, response)) {
+                return;    //假设我们拥有两个自定义的Interceptor，此时的mappedHandler.interceptorList中有三个截断器：
+                                1.ConversionServiceExposingInterceptor
+                                2.FirstInterceptor
+                                3.SecondInterceptor
+                                并且进入该方法 内部（属于HandlerExecutionChain类），我们发现其将会安装顺序遍历interceptorList，
+
+            }
+
+            mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+            if (asyncManager.isConcurrentHandlingStarted()) {
+                return;
+            }
+
+            this.applyDefaultViewName(processedRequest, mv);
+            mappedHandler.applyPostHandle(processedRequest, response, mv);
+                进入该方法中（属于HandlerExecutionChain类），我们发现与applyPreHandle不同，
+                这里的遍历是逆序（for(int i = this.interceptorList.size() - 1; i >= 0; --i)）
+
+            。。。
+            this.processDispatchResult(processedRequest, response, mappedHandler, mv, (Exception)dispatchException);
+
+    processDispatchResult方法在596行（DispatcherServlet类）
+                this.render(mv, request, response);
+
+                if (!WebAsyncUtils.getAsyncManager(request).isConcurrentHandlingStarted()) {
+                    if (mappedHandler != null) {
+                        mappedHandler.triggerAfterCompletion(request, response, (Exception)null);
+                    }
+                    我们进入triggerAfterCompletion方法（属于HandlerExecutionChain类），
+                    我们发现遍历也是逆序（for(int i = this.interceptorIndex; i >= 0; --i) {）
+2.2两个两个拦截器First和Second，设置First的preHandle方法返回true，而Second的preHand返回False时的程序执行流程
+返回结果：
+    FirstInterceptor-->preHandle
+    SecondInterceptor-->preHandle
+    FirstInterceptor-->afterCompletion
+
+    536行（DispatcherServlet）
+            if (!mappedHandler.applyPreHandle(processedRequest, response)) {
+                return;    //假设我们拥有两个自定义的Interceptor，此时的mappedHandler.interceptorList中有三个截断器：
+                                1.ConversionServiceExposingInterceptor
+                                2.FirstInterceptor
+                                3.SecondInterceptor
+                                并且进入该方法 内部（属于HandlerExecutionChain类），我们发现其将会安装顺序遍历interceptorList，
+                                内部（属于HandlerExecutionChain类）：对于前两个Interceptor则会跳过下面的if判断，但是SecondInterceptor
+                                    将会进入if中，调用triggerAfterCompletion方法；
+                                    此时我们需要注意参数interceptorIndex的值是1对应FirstInterceptor
+
+                                for(int i = 0; i < this.interceptorList.size(); this.interceptorIndex = i++) {
+                                    HandlerInterceptor interceptor = (HandlerInterceptor)this.interceptorList.get(i);
+                                    if (!interceptor.preHandle(request, response, this.handler)) {
+                                        this.(request, response, (Exception)null);
+                                        return false;
+                                    }
+                                }
+                                我们进入triggerAfterCompletion方法
+
+            }
+
+
+2.3注意：
+    即使访问的请求不存在对应的controller的方法，只要preHandle放行，则postHandle和afterCompletion也会执行
+
+3.多个拦截器的执行顺序（多个拦截器的执行顺序和拦截器在SpringMVC的配置文件的配置顺序有关）
+
+  ①若每个拦截器的preHandle()都返回true，此时多个拦截器的执行顺序和拦截器在SpringMVC的配置文件的配置顺序有关：
+                    preHandle()会按照配置的顺序执行，
+                    而postHandle()和afterCompletion()会按照配置的反序执行
+
+  ②若某个拦截器的preHandle()返回了false
+                    preHandle()和它之前的拦截器的preHandle()都会执行，
+                    postHandle()都不执行，返回false的拦截器之前的拦截器的afterCompletion()会执行
+
+
+
+4.总结
+    拦截器的三个方法：
+     * preHandle()：在控制器方法执行之前执行，其返回值表示对控制器方法的拦截(false)或放行(true)
+     * postHandle()：在控制器方法执行之后执行
+     * afterCompletion()：在控制器方法执行之后，且渲染视图完毕之后执行
+     *
+     * 多个拦截器的执行顺序和在SpringMVC的配置文件中配置的顺序有关
+     * preHandle()按照配置的顺序执行，而postHandle()和afterCompletion()按照配置的反序执行
+     *
+     * 若拦截器中有某个拦截器的preHandle()返回了false
+     * 拦截器的preHandle()返回false和它之前的拦截器的preHandle()都会执行
+     * 所有的拦截器的postHandle()都不执行
+     * 拦截器的preHandle()返回false之前的拦截器的afterCompletion()会执行
+---------------------------------------------拦截器：end---------------------------------------------------------------
+5.异常处理器(基于·配置·|·注解·的异常处理)
+
+SpringMVC提供了一个处理控制器方法执行过程中所出现的异常的接口：`HandlerExceptionResolver（接口）(异常处理解析器)`
+
+    HandlerExceptionResolver接口中有方法：
+        ModelAndView resolveException(HttpServletRequest var1, HttpServletResponse var2, @Nullable Object var3, Exception var4);
+        可以非常方便的处理控制器方法中所出现的异常，并且设置一个新的ModelAndView实现共享域对象数据和页面跳转
+        springmvc默认就是使用了异常解析器，即DefaultHandlerExceptionResolver
+        如果我们想要自己配置，则使用SimpleMappingExceptionResolver（springmvc提供的自定义的异常解析器）
+
+    HandlerExceptionResolver接口的实现类有：DefaultHandlerExceptionResolver和SimpleMappingExceptionResolver
+    SpringMVC提供了自定义的异常处理器SimpleMappingExceptionResolver，
+    使用方式：
+5.1基于配置的异常处理
+    实验基础：假设我们的controller方法中出现了java.lang.ArithmeticException异常，我们希望出现该错误时跳转到error.html
+
+    实现：
+        基于SimpleMappingExceptionResolver自己配置的异常处理解析器步骤：
+        即：设置bean，在其中设置两个属性
+            <!--属性1：exceptionMappings-->
+            <!--属性2：exceptionAttribute-->
+
+            <bean class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+                <!--属性1：exceptionMappings-->
+                <property name="exceptionMappings">
+                    <props>
+                        <!--
+                            properties的键表示处理器方法执行过程中出现的异常
+                            properties的值表示若出现指定异常时，设置一个新的视图名称，跳转到指定页面
+                        -->
+                        key设置要处理的异常，
+                        error代表出现该异常时要跳转的页面岁对应的逻辑视图
+                        <prop key="java.lang.ArithmeticException">error</prop>
+                    </props>
+                </property>
+                <!--属性2：exceptionAttribute-->
+                <!-- exceptionAttribute属性设置一个属性名，将出现的异常信息在请求域中进行共享-->
+                <property name="exceptionAttribute" value="ex"></property>
+            </bean>
+    测试结果：
+        我们在controller中sout(1/0),并且在error.html中写入：<p th:text="${ex}"></p>
+        用来接收bean中SimpleMappingExceptionResolver的属性exceptionAttribute设置的ex
+
+5.2基于注解的异常处理（@ControllerAdvice）
+@ControllerAdvice将当前类标识为异常处理的组件
+@ExceptionHandler(value={,,})用于设置所标识方法处理的异常
+
+        @ControllerAdvice
+        public class ExceptionHandderTest {
+            @ExceptionHandler(ArithmeticException.class)
+            public String test(Throwable|Exception ex,Model model){
+                model.addAttribute("ex", ex);  //ex表示当前请求处理中出现的异常对象
+                return "error";
+            }
+        }
+
+需要明白：
+    基于注解的方法和xml方式效果一样
+------------------------------------------------------------------------------------

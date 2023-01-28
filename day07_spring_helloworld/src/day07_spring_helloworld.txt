@@ -1,0 +1,72 @@
+1. IOC和DI的关系
+    IOC：Inversion of Control，翻译过来是反转控制
+    DI：Dependency Injection，翻译过来是依赖注入。
+        IOC 就是一种反转控制的思想， 而 DI 是对 IOC 的一种具体实现。
+2. IOC容器在Spring中的实现：
+Spring 提供了 IOC 容器的两种实现方式：
+
+    2.1 BeanFactory
+        是 Spring 内部使用的接口。面向 Spring 本身，不提供给开发人员使用。
+    2.2 ApplicationContext（接口）
+        BeanFactory 的子接口，提供了更多高级特性。面向 Spring 的使用者
+
+3. ApplicationContext接口的具体实现类
+    3.1. org.springframework.context.ApplicationContext（接口）
+    3.2. org.springframework.context.ConfigurableApplicationContext（接口）
+        ConfigurableApplicationContext是ApplicationContext的子接口，
+        其相比ApplicationContext提供了刷新容器和关闭容器的方法。
+        包含一些扩展方法refresh() 和 close() ，
+        让 ApplicationContext 具有启动、关闭和刷新上下文的能力。
+
+    3.3.实现类
+       3.3.1 org.springframework.context.support.FileSystemXmlApplicationContext（用的少）
+            通过文件系统路径读取 XML 格式的配置文件创建 IOC 容器对象
+       3.3.2 org.springframework.context.support.ClassPathXmlApplicationContext（用的多）
+            通过读取类路径下的 XML 格式的配置文件创建 IOC 容器对象
+     3.4WebApplicationContext
+        如果我们创建的是JavaWeb项目，则我们就会得到这个WebApplicationContext
+        WebApplicationContext专门为 Web 应用准备，基于 Web 环境创建 IOC 容器对象，
+        并将对象引入存入 ServletContext 域中。
+
+---------------------------------
+4.实验一：HelloWorld入门案例
+步骤
+    4.1 创建Maven Module
+    4.2 引入依赖
+        （ 基于Maven依赖传递性，导入spring-context依赖即可导入当前所需所有jar包）
+        （spring-jcl是一个日志框架）
+    4.3在Spring的配置文件(applicationContext.xml现阶段名字不固定，可以自定义)中配置bean(id class)
+    4.4创建测试类测试
+        我们使用ClassPathXmlApplicationContext(configLocation:)
+         //1.获取ioc容器
+         ApplicationContext ioc = new ClassPathXmlApplicationContext("applicationContext.xml");
+         //2.后去ioc容器中的bean(这个过程中，我们就是让spring创建的类对象)
+         HelloWorld hello = (HelloWorld) ioc.getBean("hello");//使用的bean标签的id属性作为name
+         hello.sayHello();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

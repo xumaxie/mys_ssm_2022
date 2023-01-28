@@ -1,0 +1,513 @@
+1.关于Tocmat服务器(Application Context为xj02)
+我们只需将模块的war-exploded加入后，设置各自的Application Context即可，无需添加新的tocamt
+    - war模式：将WEB工程以包的形式上传到服务器 ；
+    - war exploded模式：将WEB工程以当前文件夹的位置关系上传到服务器；
+    （1）war模式这种可以称之为是发布模式，看名字也知道，这是先打成war包，再发布；
+    （2）war exploded模式是直接把文件夹、jsp页面 、classes等等移到Tomcat 部署文件夹里面，
+        进行加载部署。因此这种方式支持热部署，一般在开发的时候也是用这种方式。
+    （3）在平时开发的时候，使用热部署的话，应该对Tomcat进行相应的设置，这样的话修改的jsp界面什么的东西才可以及时的显示出来。
+    原文链接：https://blog.csdn.net/xlgen157387/article/details/56498938
+
+2.@RequestMapping注解（请求映射）
+    作用就是将请求和处理请求的控制器方法关联起来，建立映射关系
+2.1@RequestMapping注解的位置（无论是修饰类还是方法）
+    @RequestMapping标识一个类：    设置映射请求的请求路径的初始信息
+    @RequestMapping标识一个方法：  设置映射请求请求路径的具体信息
+
+    应用案例：比如我们有多个controller类，然后其中的方法的@RequestMapping(value)value相同
+    此时，我们可以把每个controller写上一个@RequestMapping
+    否则是会报错：ambigous mapping
+
+        @Controller
+        @RequestMapping("/test")
+        public class TestRequestMappingController {
+            //此时控制器所匹配的请求的请求路径为：
+            //  http://localhost:8080/xj02/test/hello
+            @RequestMapping("/hello")
+            public String success(){
+                return "success";
+            }
+        }
+2.2@RequestMapping注解的value属性(☆☆☆)
+    @RequestMapping注解的value属性通过`请求的请求地址匹配请求映射`
+    @RequestMapping注解的value属性`是一个字符串类型的数组`，表示该`请求映射`能够匹配多个请求地址所对应的请求
+    @RequestMapping注解的value属性`必须设置`，至少通过请求地址匹配请求映射
+
+2.3@RequestMapping注解的method属性
+    @RequestMapping注解的method属性通过请求的请求方式（get或post）匹配请求映射
+    @RequestMapping注解的method属性是一个RequestMethod类型的数组，表示该请求映射能够匹配多种请求方式的请求
+
+    若当前请求的请求地址满足请求映射的value属性，但是请求方式不满足method属性，则浏览器报错:405
+    405：Request method 'POST' not supported
+    @RequestMapping(
+        value = {"/testRequestMapping", "/test"}
+        //,method = RequestMethod.POST
+        ,method = {RequestMethod.GET, RequestMethod.POST}
+    )
+2.3.1在RequestMapping基础上的结合请求方式的派生注解
+    对于处理指定请求方式的控制器方法，SpringMVC中提供了@RequestMapping的派生注解
+      处理get请求的映射-->@GetMapping
+      处理post请求的映射-->@PostMapping
+      处理put请求的映射-->@PutMapping
+      处理delete请求的映射-->@DeleteMapping
+
+      但是目前浏览器只支持get和post，若在form表单提交时，为method设置了其他请求方式的字符串（put或delete），则按照默认的请求方式get处理，
+      若要发送put和delete请求，则需要通过spring提供的过滤器HiddenHttpMethodFilter，在RESTful部分会讲到
+
+       @PostMapping(value = "/method3")
+
+2.4@RequestMapping注解的params属性
+    - params属性通过请求的`请求参数`匹配请求映射
+    - 是一个字符串类型的数组，可以通过`四种表达式`设置请求`参数和请求映射的匹配关系`
+        "param"：要求请求映射所匹配的              `请求必须携带param请求参数`
+        "!param"：要求请求映射所匹配的             `请求必须不能携带param请求参数 ``
+        "param=value"：要求请求映射所匹配的        `请求必须携带param请求参数且param=value ``
+        "param!=value"：要求请求映射所匹配的       `请求可以不携带param请求参数但是若有则必须满足param!=value`
+
+    - 实验
+        <a th:href="@{/test(username='admin',password=123456)">测试@RequestMapping的params属性-->/test</a><br>
+
+        @RequestMapping(
+            value = {"/testRequestMapping", "/test"}
+            ,method = {RequestMethod.GET, RequestMethod.POST}
+            ,params = {"username","password!=123456"}
+        )
+        public String testRequestMapping(){
+            return "success";
+        }
+    - 若当前请求满足@RequestMapping注解的value和method属性，但是不满足params属性，此时页面回报错
+        400：Parameter conditions "username, password!=123456" not met for actual request parameters: username={admin}, password={123456}
+
+2.5@RequestMapping注解的headers属性
+    - 通过请求的请求头信息匹配请求映射
+    - 是一个字符串类型的数组，可以通过四种表达式设置请求头信息和请求映射的匹配关系
+        "header"：要求请求映射所匹配的请求必须携带header请求头信息
+        "!header"：要求请求映射所匹配的请求必须不能携带header请求头信息
+        "header=value"：要求请求映射所匹配的请求必须携带header请求头信息且header=value
+        "header!=value"：要求请求映射所匹配的请求必须携带header请求头信息且header!=value
+    - 若当前请求满足@RequestMapping注解的value和method属性，但是不满足headers属性，此时页面显示404错误，即资源未找到
+
+3.SpringMVC支持ant风格的路径
+    ？：表示任意的单个字符(不包括？)
+            @RequestMapping("/a?a/test/ant")
+            public String antTest(){
+                return "success";
+            }
+    *：表示任意的0个或多个字符(不包括*和/)
+
+    **：表示任意层数的任意目录，注意：在使用**时，只能使用/**/xxx的方式
+            @RequestMapping("/**/test/ant")
+            public String antTest(){
+                return "success";
+            }
+
+4.SpringMVC支持路径中的占位符（重点）
+        原始方式：/deleteUser?id=1
+        rest方式：/user/delete/1  现在把传输的参数也当做路径的一部分
+            问题：原始方式是键值对，现在如何获取键
+                在@RequestMapping的value中使用`{}`占位符
+                并且可以使用PathVariable注解将传输过来的值作为函数的形参的值
+
+    SpringMVC路径中的占位符常用于RESTful风格中，当请求路径中将某些数据通过路径的方式传输到服
+    务器中，就可以在相应的@RequestMapping注解的value属性中通过占位符{xxx}表示传输的数据，在
+    通过@PathVariable注解，将占位符所表示的数据赋值给控制器方法的形参
+
+    - 实验：
+        <a th:href="@{/testRest/1/admin}">测试路径中的占位符-->/testRest</a><br>
+
+        @RequestMapping("/testRest/{id}/{username}")
+        public String testRest(@PathVariable("id") String id, @PathVariable("username")
+        String username){
+            System.out.println("id:"+id+",username:"+username);
+            return "success";
+        }
+        //最终输出的内容为-->id:1,username:admin
+
+---------------------------第一部分:总结----------------------------------------------------------------
+
+    1、@RequestMapping注解标识的位置
+     @RequestMapping标识一个类：设置映射请求的请求路径的初始信息
+     @RequestMapping标识一个方法：设置映射请求请求路径的具体信息
+    2、@RequestMapping注解value属性
+     作用：通过请求的请求路径匹配请求
+     value属性是数组类型，即当前浏览器所发送请求的请求路径匹配value属性中的任何一个值
+     则当前请求就会被注解所标识的方法进行处理
+    3、@RequestMapping注解的method属性
+     作用：通过请求的请求方式匹配请求
+     method属性是RequestMethod类型的数组，即当前浏览器所发送请求的请求方式匹配method属性中的任何一中请求方式
+     则当前请求就会被注解所标识的方法进行处理
+     若浏览器所发送的请求的请求路径和@RequestMapping注解value属性匹配，但是请求方式不匹配
+     此时页面报错：405 - Request method 'xxx' not supported
+     在@RequestMapping的基础上，结合请求方式的一些派生注解：
+     @GetMapping,@PostMapping,@DeleteMapping,@PutMapping
+    4、@RequestMapping注解的params属性
+     作用：通过请求的请求参数匹配请求，即浏览器发送的请求的请求参数必须满足params属性的设置
+     params可以使用四种表达式：
+     "param"：表示当前所匹配请求的请求参数中必须携带param参数
+     "!param"：表示当前所匹配请求的请求参数中一定不能携带param参数
+     "param=value"：表示当前所匹配请求的请求参数中必须携带param参数且值必须为value
+     "param!=value"：表示当前所匹配请求的请求参数中可以不携带param，若携带值一定不能是value
+     若浏览器所发送的请求的请求路径和@RequestMapping注解value属性匹配，但是请求参数不匹配
+     此时页面报错：400 - Parameter conditions "username" not met for actual request parameters:
+    5、@RequestMapping注解的headers属性
+     作用：通过请求的请求头信息匹配请求，即浏览器发送的请求的请求头信息必须满足headers属性的设置
+     若浏览器所发送的请求的请求路径和@RequestMapping注解value属性匹配，但是请求头信息不匹配
+     此时页面报错：404
+    6、SpringMVC支持ant风格的路径
+     在@RequestMapping注解的value属性值中设置一些特殊字符
+     ?:任意的单个字符（不包括?）
+     *:任意个数的任意字符（不包括?和/）
+     **:任意层数的任意目录，注意使用方式只能**写在双斜线中，前后不能有任何的其他字符
+    7、@RequestMapping注解使用路径中的占位符
+     传统：/deleteUser?id=1
+     rest：/user/delete/1
+     需要在@RequestMapping注解的value属性中所设置的路径中，使用{xxx}的方式表示路径中的数据
+     在通过@PathVariable注解，将占位符所标识的值和控制器方法的形参进行绑定
+
+---------------------------第一部分:end----------------------------------------------------------------
+-------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------
+
+---------------------------第二部分：关于SpringMVC获取请求参数的方式----------------------------------------------------------------
+5.SpringMVC获取请求参数（两种方法）
+ 获取请求参数--调用service处理业务逻辑--向域对象共享数据--页面跳转（转发、重定向）（SpringMVC的视图）
+
+ TestParamController
+5.1通过ServletAPI获取:(用的不多)
+    HttpServletRequest request
+    request.getParameter("参数名")
+
+5.2通过控制器方法的形参获取请求参数（☆☆☆☆☆）（表单项的name属性（请求参数的名字）就是形参的名字）大小写也要完全一致
+    情况一：请求参数与形参名字一致：
+        <a th:href="@{/testParam(username='admin',password=123456)}">测试获取请求参数-->/testParam</a><br>
+
+        @RequestMapping("/testParam")
+        public String testParam(String username, String password){
+            System.out.println("username:"+username+",password:"+password);
+            return "success";
+        }
+    情况二：请求参数与形参名字不一致，我们需要自己建立映射关系（@RequestParam(三个属性)）
+        @RequestParam(三个属性)
+        - value：指定为形参赋值的`请求参数的参数名`
+        - required：设置`是否必须传输此请求参数`，默认值为true
+            若设置为true时，则当前请求必须传输value所指定的请求参数，
+                若没有传输该请求参数，且没有设置defaultValue属性，则页面报错400：Required String parameter 'xxx' is not present；
+            若设置为false，则当前请求不是必须传输value所指定的请求参数，
+                若没有传输，则注解所标识的形参的值为null
+        - defaultValue：不管required属性值为true或false，当value所指定的请求参数没有传输或传输的值为""时，则使用默认值为形参赋值
+
+        @RequestMapping("/param/servletAPI")
+        public String getParamByServletAPI(HttpServletRequest request){
+            HttpSession session = request.getSession();  //让浏览器保留一个Cookie
+            String username = request.getParameter("username");
+            String password = request.getParameter("password");
+            System.out.println("username:"+username+",password:"+password);
+            return "success";
+        }
+
+        @RequestMapping("/param")
+        public String getParam(
+                @RequestParam(value = "userName", required = true, defaultValue = "hello") String username,
+                String password,
+                @RequestHeader("referer") String referer,
+                @CookieValue("JSESSIONID") String jsessionId
+        ){
+            System.out.println("jsessionId:"+jsessionId);
+            System.out.println("referer:"+referer);
+            System.out.println("username:"+username+",password:"+password);
+            return "success";
+        }
+
+    情况三：通过POJO获取请求参数(前提是：pojo类的属性要与请求参数的名字一致)
+
+        <form th:action="@{/test/pojo}" method="post">
+            用户名：<input type="text" name="username"><br>
+            密码：<input type="password" name="password"><br>
+            性别：<input type="radio" name="sex" value="男">男<input type="radio"name="sex" value="女">女<br>
+            年龄：<input type="text" name="age"><br>
+            邮箱：<input type="text" name="email"><br>
+            <input type="submit">
+        </form>
+
+        @RequestMapping("/test/pojo")
+        public String pojoTest(User user){
+            System.out.println(user); //User{username='rhfoovuk', password='123', sex='??·', age=12, email='xjqq.com'}
+            return "success";
+        }
+
+7.解决获取请求参数的乱码问题
+javaweb中，我们使用的是ServletAPI获取request，然后setCharacterSet("编码类型"),
+但是现在springmvc封装了servlet，我们再从servlet去设置，就很弱智。因为springmvc内部肯定帮我们做了，我们只需要用就好了
+还有，在设置编码之前，不能获取任何请求参数，否则设置编码的代码就会失效
+tocmat7和tocmat8
+    tocmat7中get和post都会出现乱码，解决get乱码的操作需要去修改配置文件：conf/server.xml
+    而对于post，tocmat7和8则需要代码设置，如果使用springmvc只需下面注册CharacterEncodingFilter
+
+    使用SpringMVC提供的`编码过滤器CharacterEncodingFilter`，但是`必须在web.xml中进行注册`
+
+    <filter>
+        <filter-name>CharacterEncodingFilter</filter-name>
+        <filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+        <!--自定义编码-->
+        <!--只设置请求的编码-->
+        <init-param>
+            <param-name>encoding</param-name>
+            <param-value>UTF-8</param-value>
+        </init-param>
+        <!--设置请求的编码和响应的编码-->
+        <init-param>
+            <param-name>forceEncoding</param-name>
+            <param-value>true</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>CharacterEncodingFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+- 关于CharacterEncodingFilter的继承关系
+    Filter(接口)--GenericFilterBean --OncePerRequestFilter--CharacterEncodingFilter
+    在javaweb中我们学到过滤器其中有三个方法：
+        初始化  放行（三个参数）  销毁
+        void init(FilterConfig var1) throws ServletException;
+        void doFilter(ServletRequest var1, ServletResponse var2, FilterChain var3) throws IOException, ServletException;
+        void destroy();
+    OncePerRequestFilter实现类Filter的doFilter方法，然后我们去CharacterEncodingFilter看并没有重写doFilter，推测其应该有一个方法调用了父类重写的doFilter
+    于是我们找到doFilterInternal，其中有一些涉及的参数encoding\,再去看CharacterEncodingFilter的三个构造器，其中涉及的形参
+    就是encoding和forceEncoding,其中forceEncoding, forceEncoding两个的值就是来自forceEnoding
+    因此在xml文件中，我们配置的就是这两个init-param
+
+- SpringMVC中处理编码的过滤器一定要配置到其他过滤器之前，否则无效
+
+---------------------------第二部分:总结----------------------------------------------------------------
+
+* 获取请求参数的方式：
+1、通过servletAPI获取
+    只需要在控制器方法的形参位置设置HttpServletRequest类型的形参
+    就可以在控制器方法中使用request对象获取请求参数
+2、通过控制器方法的形参获取
+    只需要在控制器方法的形参位置，设置一个形参，形参的名字和请求参数的名字一致即可
+3、@RequestParam：将请求参数和控制器方法的形参绑定
+    @RequestParam注解的三个属性：value、required、defaultValue
+    value:设置和形参绑定的请求参数的名字
+    required:设置是否必须传输value所对应的请求参数
+        默认值为true，表示value所对应的请求参数必须传输，否则页面报错：
+        400 - Required String parameter 'xxx' is not present
+        若设置为false，则表示value所对应的请求参数不是必须传输，若为传输，则形参值为null
+    defaultValue:设置当没有传输value所对应的请求参数时，为形参设置的默认值，此时和required属性值无关
+4、@RequestHeader：将请求头信息和控制器方法的形参绑定，使用方式同RequestParam
+5、@CookieValue：将cookie数据和控制器方法的形参绑定，使用方式同RequestParam
+6、通过控制器方法的实体类类型的形参获取请求参数
+    需要在控制器方法的形参位置设置实体类类型的形参，要保证实体类中的属性的属性名和请求参数的名字一致
+    可以通过实体类类型的形参获取请求参数
+7、解决获取请求此参数的乱码问题
+    在web.xml中配置Spring的编码过滤器CharacterEncodingFilter
+---------------------------第二部分：end----------------------------------------------------------------
+-------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------
+
+---------------------------第三部分：域对象共享数据---------------------------------------------------------------
+三个域：
+    HttpServletRequest
+    HttpSession
+    ServeletContext(Application)
+
+1.向request域对象共享数据
+- 方式1：使用ServletAPI（HttpServletRequest的setAttribute()）
+    @RequestMapping("/testServletAPI")
+    public String testServletAPI(HttpServletRequest request){
+        request.setAttribute("testScope", "hello,servletAPI");
+        return "success";
+    }
+- 方式2：使用ModelAndView(☆☆☆☆☆)
+    ModelAndView包含Model和View的功能
+         *Model：向请求域中共享数据(addObject(_,_)方法)
+         *View：设置逻辑视图实现页面跳转(setViewName(_))
+
+    a)返回值类型不是String必须是ModelAndView，没有形参
+    @RequestMapping("/testModelAndView")
+    public ModelAndView testModelAndView(){
+        ModelAndView mav = new ModelAndView();
+        mav.addObject("testScope", "hello,ModelAndView");//向请求域共享数据
+        mav.setViewName("success");//设置视图，实现页面跳转
+        return mav;
+    }
+
+- 方式3：使用Model        --addAttribute(_,_)
+    a)有形参Model(因为Model是一个接口，不可能直接new,其在DispatcherServlet时创建的Model对象)
+    @RequestMapping("/testModel")
+    public String testModel(Model model){
+        model.addAttribute("testScope", "hello,Model");
+        return "success";
+    }
+
+
+- 方式4：使用map          --put(_，_);
+    a)有形参map
+    @RequestMapping("/testMap")
+    public String testMap(Map<String, Object> map){
+        map.put("testScope", "hello,Map");
+        return "success";
+
+
+
+2.源码探索
+ 2.1Model、ModelMap、Map的关系
+    本质上都是 org.springframework.validation.support.BindingAwareModelMap 类型的
+
+            AbstractMap
+            HashMap
+            LinkedHashMap extends HashMap implements Map
+            ModelMap（类）
+            ExtendedModelMap extends ModelMap（类） implements Model(接口)
+            BindingAwareModelMap
+ 2.2控制器方法被调用后，不管使用何种方向向域对象中共享数据，也不管是何种方式设计逻辑视图，其最后都被会封装到一个ModelAndView对象中
+我们通过上面的代码断电，进入debugger的frame帧中，可以往下看到DispatcherServlet调用doDispatch
+    mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+这里的mv就是ModelAndView对象，
+在获取mv对象后，下面还有一行代码为：
+    this.processDispatchResult(processedRequest, response, mappedHandler, mv, (Exception)dispatchException);
+    我们在这就可以看看mv的值：
+            ModelAndView [view="success"; model={testModelAndView=Hello,ModelAndView}]
+            使用Model ModelMap Map都是ModelAndView
+
+3.向session域共享数据(与JavaWeb阶段一样)       --session.setAttribute
+    @RequestMapping("/testSession")
+    public String testSession(HttpSession session){
+        session.setAttribute("testSessionScope", "hello,session");
+        return "success";
+    }
+
+4.向application域共享数据(与JavaWeb阶段一样)   --session.getServletContext().setAttribute()
+    @RequestMapping("/testApplication")
+    public String testApplication(HttpSession session){
+        ServletContext application = session.getServletContext();
+        application.setAttribute("testApplicationScope", "hello,application");
+        return "success";
+    }
+
+5.注意：html中的操作
+    5.1request域
+        在html中使用thymeleaf获取request域的数据时，格式如下：直接属性名即可
+      <!--错误的：<p th:text="${#request.属性名}">123</p>-->
+      正确的：<p th:text="${属性名}">12</p>
+    5.2session域(一次会话指：浏览器开启到浏览器关闭)
+        <p th:text="${session.属性名}">12</p>
+    5.3application(一次应用的范围：服务器运行的整个过程中)
+        <p th:text="${application.属性名}">12</p>
+
+    5.4IDEA中的Tocmat配置中有一个选项为：Preserve sessions across restarts and redeploys
+        表示服务器重启重新部署时，浏览器保留session。
+    5.5 session的钝化和活化
+        session的钝化：内存的数据写入到硬盘上的过程。
+        session的活化：与钝化相反，就是将硬盘的数据恢复到内存中。
+        如果session保存的是一个pojo类对象，则该对象的类应该实现可序列化接口（java基础中讲过类似）
+
+
+---------------------------第三部分：总结---------------------------------------------------------------
+
+总结
+* 向域对象共享数据：
+ * 1、通过ModelAndView向请求域共享数据
+ * 使用ModelAndView时，可以使用其Model功能向请求域共享数据
+ * 使用View功能设置逻辑视图，但是控制器方法一定要将ModelAndView作为方法的返回值
+ * 2、使用Model向请求域共享数据
+ * 3、使用ModelMap向请求域共享数据
+ * 4、使用map向请求域共享数据
+ * 5、Model和ModelMap和map的关系
+ * 其实在底层中，这些类型的形参最终都是通过BindingAwareModelMap创建
+ * public class BindingAwareModelMap extends ExtendedModelMap {}
+ * public class ExtendedModelMap extends ModelMap implements Model {}
+ * public class ModelMap extends LinkedHashMap<String, Object> {}
+---------------------------第三部分：end----------------------------------------------------------------
+-------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------
+--------------------------- 第四部分：SpringMVC的视图---------------------------------------------------------------
+
+6.SpringMVC的视图
+- 三种视图：
+    ThymeleafView
+    转发视图是InternalResourceView
+    重定向视图是RedirectView
+    在controller中返回值大多都是字符串，在javaweb阶段，我们在返回的字符串中，设置开头的部分,例如：
+        "redirect:success"，然后再DispatcherServlet中进行str的开头判断，然后进行不同的处理（重定向、转发）
+        现在，我们使用SpringMVC提供的·前端控制器DispatcherServlet·来处理时，其原理差不多，我们仅仅只需设置字符串的开头 格式即可，
+
+- SpringMVC中的视图是View接口，视图的作用渲染数据，将模型Model中的数据展示给用户
+- SpringMVC视图的种类很多，默认有`转发视图`和`重定向视图`
+- 当工程引入jstl的依赖，`转发视图InternalResourceView` 会自动转换为`JstlView`
+- 若使用的视图技术为Thymeleaf，在SpringMVC的配置文件中配置了Thymeleaf的视图解析器，由此视图解析器解析之后所得到的是`ThymeleafView`
+    在我们的springxml配置视图解析器时就是这个org.thymeleaf.spring5.view.ThymeleafViewResolver
+
+6.1关于IDEAdebug时debugge（调试器）下的方法站frame（帧）
+
+6.2ThymeleafView视图
+    解释：
+        当`控制器方法中所设置的视图名称没有任何前缀时`，
+        此时的`视图名称会被SpringMVC配置文件中所配置的视图解析器解析，`
+        视图名称拼接视图前缀和视图后缀所得到的最终路径，会通过转发的方式实现跳转
+
+    在上面2.2分析的基础上，我们进入processDispatchResult方法内部，发现：
+    this.render(mv, request, response);//渲染，我们进入该方法
+    进入render后，有两个变量：
+            String viewName = mv.getViewName();
+            View view;
+    其中viewName就是return那个字符串(此时根据字符串格式的不同),创建的view为分别为：
+                Thymeleaf视图（“ThymeleafView@...”）、转发视图、重定向视图
+
+6.3转发视图InternalResourceView
+    解释：
+        控制器方法中所设置的视图名称`以"forward:"为前缀时`，创建InternalResourceView视图，
+        此时的视图名称不会被SpringMVC配置文件中所配置的视图解析器解析，
+        而是会将前缀"forward:"去掉，`剩余部分作为最终路径通过转发的方式实现跳转`
+        例如"forward:/"，"forward:/employee"
+
+
+6.4重定向视图是RedirectView
+    解释：
+        当控制器方法中所设置的视图名称·以"redirect:"为前缀·时，创建RedirectView视图，
+        此时的视图名称不会被SpringMVC配置文件中所配置的视图解析器解析，
+        而是会将前缀"redirect:"去掉，剩余部分作为最终路径通过重定向的方式实现跳转
+        例如"redirect:/"，"redirect:/employee"
+    注意：
+        重定向视图在解析时，会先将redirect:前缀去掉，
+        然后会判断剩余部分是否以/开头，若是则会自动拼接上下文路径
+        （在javaweb阶段中直接上绝对路径是
+            在http://localhost:8080/后加上，
+            但是我们想要的是
+            http://localhost:8080/xj02（Application Context）/后加上），
+        但是我们使用springmvc不需要操心这个问题
+6.5注意：
+    使用thymeleaf进行转发时，其会在html上渲染thymeleaf语法
+    但是使用InternalResourceView不会（只是简单的转发）
+    - 而且注意forward:/或者redirect:/后面跟的是视图名字，不是想thymeleaf的字符串一样是html的文件名
+登陆成功：重定向
+登陆失败：转发
+
+7.视图控制器view-controller
+
+- 视图控制器：为当前的请求直接设置视图名称实现页面跳转
+
+- 当控制器方法中，仅仅用来实现页面跳转，即只需要设置视图名称时，可以将处理器方法使用view-controller标签（springmvc.xml中）进行表示
+    解释：
+        对于首页问题：例如我们访问http://localhost:8080/xj02（Application Context）/，通过我们设置的index
+            @RequestMapping("/")
+            public String index(){
+                return "index";
+            }
+        可以实现直接转发到首页的功能，但是使用view-controller标签更加方便。
+
+    7.1view-controller视图控制器标签
+        属性：
+             - path：设置处理的请求地址
+             - view-name：设置请求地址所对应的视图名称
+        实现例子：
+            1. <mvc:view-controller path="/" view-name="index"></mvc:view-controller>
+            2. <mvc:view-controller path="/testView" view-name="success"></mvc:view-controller>
+        注：
+         若设置视图控制器，则只有视图控制器所设置的请求会被处理，其他的请求将全部404(其他控制器中的请求映射将全部失效)
+         此时必须在(要在SpringMVC的核心配置文件中)配置一个标签：<mvc:annotation-driven/>
+
+8.开启mvc的注解驱动
+（mvc:annotation-driven
+-------------------------------------end----------------------------------------------------------------

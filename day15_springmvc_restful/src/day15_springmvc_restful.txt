@@ -1,0 +1,246 @@
+1.RESTful
+    REST：Representational State Transfer，表现层资源状态转移。
+
+    具体说，就是 HTTP 协议里面，四个表示操作方式的动词：GET、POST、PUT、DELETE。
+    它们分别对应四种基本操作：
+                    GET 用来获取资源，
+                    POST 用来新建资源，
+                    PUT 用来更新资源，
+                    DELETE用来删除资源。
+
+    REST 风格提倡 URL 地址使用统一的风格设计
+    | **操作** | **传统方式**     | **REST****风格**        |
+    | -------- | ---------------- | ----------------------- |
+    | 查询操作 | getUserById?id=1 | user/1-->get请求方式    |
+    | 保存操作 | saveUser         | user-->post请求方式     |
+    | 删除操作 | deleteUser?id=1  | user/1-->delete请求方式 |
+    | 更新操作 | updateUser       | user-->put请求方式      |
+
+IDEA(ctrl+d是复制该行到下一行)
+
+2.RESTful的简单测试
+    <a th:href="@{/user}">查看所有用户的信息</a>
+    <a th:href="@{/user/1}">根据id查看用户信息</a>
+    <form th:action="@{/user}" method="post">
+        <input type="submit" value="添加用户的信息"/>
+    </form>
+    <form th:action="@{/user}" method="put">
+        <input type="submit" value="修改用户的信息"/>
+    </form>
+
+    @Controller
+    public class TestRestController {
+
+        @RequestMapping(value = "/user",method = RequestMethod.GET)
+        public String testOne(){
+            System.out.println("查看所有用户的信息 /user---->get");
+            return "success";
+        }
+        @RequestMapping(value = "/user/{id}",method = RequestMethod.GET)
+        public String testTwo(@PathVariable Integer id){
+            System.out.println("2.根据id查看用户信息 /user/1---->get,id为"+id);
+            return "success";
+        }
+        @RequestMapping(value = "/user",method = RequestMethod.POST)
+        public String testThree(){
+            System.out.println("3.添加用户的信息 /user---->post");
+            return "success";
+        }
+        @RequestMapping(value = "/user",method = RequestMethod.PUT)
+        public String testFour(){
+            System.out.println("4.更新用户的信息 /user---->put");
+            return "success";
+        }
+    }
+3.过滤器
+通过上面的测试我们发现PUT请求被服务器处理为get请求了，这是由于浏览器只支持发送get和post方式的请求。
+- 该如何发送put和delete请求呢？
+    SpringMVC 提供了 HiddenHttpMethodFilter 帮助我们将POST请求转换为DELETE或PUT请求
+
+- HiddenHttpMethodFilter处理put和delete请求的条件：
+    a>当前请求的请求方式必须为post
+    b>当前请求必须传输请求参数 _method(html中的name)
+  满足以上条件，**HiddenHttpMethodFilter** 过滤器就会将当前请求的请求方式转换为请求参数method的值，
+  因此请求参数method的值才是最终的请求方式
+
+注意：
+    需要在web.xml中注册HiddenHttpMethodFilter，并且位置不能在设置编码的过滤器之前
+
+        <form th:action="@{/user}" method="post">
+            <input type="hidden" name="_method" value="put"/>
+            <input type="submit" value="修改用户的信息"/>
+        </form>
+        <form th:action="@{/user/1}" method="post">
+            <input type="hidden" name="_method" value="delete"/>
+            <input type="submit" value="删除用户的信息"/>
+        </form>
+
+        @RequestMapping(value = "/user",method = RequestMethod.PUT)
+        或者使用派生注解@PutMapping("/user")
+        public String testFour(){
+            System.out.println("4.更新用户的信息 /user---->put");
+            return "success";
+        }
+        @RequestMapping(value = "/user/{id}",method = RequestMethod.DELETE)
+            public String testFive(@PathVariable Integer id){
+                System.out.println("5.删除用户的信息 /user/1---->delete");
+                return "success";
+        }
+
+4.HiddenHttpMethodFilter源码解析
+    Filter（接口）
+    GenericFilterBean
+    OncePerRequestFilter
+    HiddenHttpMethodFilter
+
+    doFilterInternal方法内部有一段下面的代码：
+            HttpServletRequest requestToUse = request;
+            if ("POST".equals(request.getMethod()) && request.getAttribute("javax.servlet.error.exception") == null) {
+                //1.this.methodParam其实就是"_method"
+                String paramValue = request.getParameter(this.methodParam);
+                if (StringUtils.hasLength(paramValue)) {
+                    String method = paramValue.toUpperCase(Locale.ENGLISH);
+                    //2.ALLOWED_METHODS是一个列表，来自HiddenHttpMethodFilter的static块
+                    /**
+                        static {
+                            ALLOWED_METHODS = Collections.unmodifiableList(
+                                                Arrays.asList(
+                                                        HttpMethod.PUT.name(),
+                                                        HttpMethod.DELETE.name(),
+                                                        HttpMethod.PATCH.name()
+                                                        )
+                                                        );
+                        }
+                       ------------------
+                               //private static final List<String> ALLOWED_METHODS
+                               //ALLOWED_METHODS等于[PUT, DELETE, PATCH]
+
+                    */
+                    if (ALLOWED_METHODS.contains(method)) {
+                        //3.HttpMethodRequestWrapper,这个其实就是将我们接收的_method的值设置为我们的请求方式，
+                        （即使用_method的值替换POST）
+                        HttpMethodRequestWrapper继承了HttpServletRequestWrapper,
+                        而HttpServletRequestWrapper实现了HttpServletRequest接口，
+                        因此使用HttpMethodRequestWrapper可以new一个HttpServletRequest对象
+
+                        requestToUse = new HiddenHttpMethodFilter.HttpMethodRequestWrapper(request, method);
+                    }
+                }
+            }
+
+            filterChain.doFilter((ServletRequest)requestToUse, response);
+        }
+
+----------------------------------------------------------------
+5.# RESTful案例
+1)创建Employee和EmployeeDao（注意注解ioc的注解+扫描）
+2)| **功能**            | **URL** **地址** | **请求方式** |
+  | ------------------- | ---------------- | ------------ |
+  | 访问首页√           | /                | GET          |
+  | 查询全部数据√       | /employee        | GET          |
+  | 删除√               | /employee/2      | DELETE       |
+  | 跳转到添加数据页面√ | /toAdd           | GET          |
+  | 执行保存√           | /employee        | POST         |
+  | 跳转到更新数据页面√ | /employee/2      | GET          |
+  | 执行更新√           | /employee        | PUT          |
+
+3)具体功能：访问首页
+    对于首页我们就使用view-controller视图控制器即可
+
+4)具体功能：查询所有员工数据
+    分析：发送请求，调用service,域对象共享数据，页面跳转
+    我们将存放employee的list共享与request域中
+        初始页面：index
+        页面跳转：employee_list
+
+        Employee Info
+        id	lastName	email	gender	options(add)
+        1001	E-AA	aa@163.com	1	delete update
+        1002	E-BB	bb@163.com	1	delete update
+
+-------------------------------------------------------------------------------
+补充：在删除中我们引入了一些静态资源，
+    - 如果IDEA中target的`...-SNAPSHOT`下没有我们引入的static文件夹，我们可以去maven构建工具的 Lifecycle下使用clean然后package即可
+    - 由于DispatcherServlet设置的 url-pattern为"/" 覆盖了tocmat中的默认配置，因此无法对静态资源的请求进行处理，
+    因此会报浏览器的F12可以看到：Failed to load resource: the server responded with a status of 404 (Not Found)
+    - 因此为了让默认的Servlet处理静态资源，我们需要使用标签<mvc:default-servlet-handler />
+    - 注意：<mvc:default-servlet-handler />单独使用无效，需要开启mvc的注解驱动
+    <mvc:annotation-driven />
+    <mvc:default-servlet-handler />
+          总结：
+                配置默认的servlet处理静态资源
+                当前工程的web.xml配置的前端控制器DispatcherServlet的url-pattern是/
+                tomcat的web.xml配置的DefaultServlet的url-pattern也是/
+                此时，浏览器发送的请求会优先被DispatcherServlet进行处理，但是DispatcherServlet无法处理静态资源
+                若配置了<mvc:default-servlet-handler />，此时浏览器发送的所有请求都会被DefaultServlet处理
+                若配置了<mvc:default-servlet-handler />和<mvc:annotation-driven />
+                浏览器发送的请求会先被DispatcherServlet处理，无法处理在交给DefaultServlet处理
+
+例如：
+    <link rel="stylesheet" th:href="@{/static/css/index_work.css}"/>
+
+-------------------------------------------------------------------------------
+
+6)具体功能：跳转到添加数据页面
+    分析：form表单的post操作(通过index跳转到添加页面（使用view-controller）)
+
+7)具体功能：执行保存
+    分析：就是提交表单，单后controller接收Employee对象，然后调用dao的save，然后redirect:/employee
+
+8)具体功能：跳转到更新数据页面
+    1.
+    <a th:href="@{'/employee/'+${employee.id}}">update</a>  //注意写法，需要字符换拼接
+    2.
+    @GetMapping("/employee/{id}")
+    public String toUpdate(@PathVariable Integer id, Model model) {
+        Employee employee = employeeDao.get(id);
+        //我们需要把对象共享到域对象
+        model.addAttribute("employee", employee);
+        return "employee_update";
+    }
+
+
+9)具体功能：执行更新
+    这时需要浏览器发送请求来更新，因此我们需要去employee_update.html中设置借助post方式实现put的请求
+        <form th:action="@{/employee}" method="post">
+            <input type="hidden" name="_method" value="put"> //put请求
+            <input type="hidden" name="id" th:value="${employee.id}">
+                //发送emp的id,这个就是为例让接收的Emp对象的id不为空，然后调用service中的save实现覆盖而不是添加
+        @PutMapping("employee")
+        public String updateEmp(Employee employee) {
+            employeeDao.save(employee);
+            return "redirect:/employee";
+        }
+ -----------------------------------------
+5)具体功能：删除（☆☆☆☆☆）
+    分析：我们的删除是一个超链接的按钮，但是由于服务器的DELETE请求必须有表单，
+        因此形式上应该是点击超链接后，form表单（post）提交（其中有一个<input type="hidden" name="_method" value="delete"/>实现DELETE请求）
+    如何实现该功能：VUE
+      第一步：在employee-list.html中加入：
+            <script type="text/javascript" th:src="@{/static/js/vue.js}"></script>
+            <script type="text/javascript">
+                var vue = new Vue({
+                    el:"#app",
+                    methods:{
+                        deleteEmployee(){
+                            //获取form表单
+                            var form = document.getElementsByTagName("form")[0];
+                            //将超链接的href属性值赋值给form表单的action属性
+                            //event.target表示当前触发事件的标签（代表当前我点击的是哪一个超链接）
+                            form.action = event.target.href;
+                            //表单提交
+                            form.submit();
+                            //阻止超链接的默认行为（不让超链接自己跳转）
+                            event.preventDefault();
+                        }
+                    }
+                });
+            </script>
+      第二步：在employee-list.html中修改删除标签
+            <a class="deleteA" @click="deleteEmployee" th:href="@{'/employee/'+${employee.id}}">delete
+                <input type="hidden" name="_method" value="delete"/>
+            </a>
+
+-----------------------------------------
+
+

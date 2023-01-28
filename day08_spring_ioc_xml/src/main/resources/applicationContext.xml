@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="studentOne" class="com.atguigu.spring.pojo.Student"></bean>
+
+    <bean id="studentTwo" class="com.atguigu.spring.pojo.Student">
+        <!-- property标签：通过组件类的setXxx()方法给组件对象设置属性 -->
+        <!-- name属性：指定属性名（这个属性名是getXxx()、setXxx()方法定义的，和成员变量无关）-->
+        <!-- value属性：指定属性值 -->
+        <property name="sid" value="1001"></property>
+        <property name="sname" value="xll"></property>
+        <property name="age" value="23"></property>
+        <property name="gender" value="男"></property>
+    </bean>
+
+    <bean id="studentThree" class="com.atguigu.spring.pojo.Student">
+        <constructor-arg value="1002"></constructor-arg>
+        <constructor-arg value="李梅"></constructor-arg>
+        <constructor-arg value="56"></constructor-arg>
+        <constructor-arg value="女"></constructor-arg>
+    </bean>
+
+    <bean id="studentFour" class="com.atguigu.spring.pojo.Student">
+        <property name="sid" value="1001"></property>
+        <property name="sname">
+            <value><![CDATA[<XUJIAN>]]></value>
+        </property>
+        <property name="age" value="23"></property>
+        <property name="gender" value="男"></property>
+    </bean>
+
+
+    <bean id="ClazzOne" class="com.atguigu.spring.pojo.Clazz">
+        <property name="clazzId" value="1"></property>
+        <property name="clazzName" value="高三五班"></property>
+    </bean>
+    <bean id="studentFive" class="com.atguigu.spring.pojo.Student">
+        <property name="sid" value="1001"></property>
+        <property name="sname" value="李梅"></property>
+        <property name="age" value="23"></property>
+        <property name="gender" value="男"></property>
+        <property name="clazz" ref="ClazzOne"></property>
+    </bean>
+
+    <bean id="studentSix" class="com.atguigu.spring.pojo.Student">
+        <property name="sid" value="1001"></property>
+        <property name="sname" value="李梅"></property>
+        <property name="age" value="23"></property>
+        <property name="gender" value="男"></property>
+        <property name="clazz" >
+            <!--<bean id="clazzInner" class="com.atguigu.spring.pojo.Clazz">-->
+            <bean id="clazzInner" class="com.atguigu.spring.pojo.Clazz">
+                <property name="clazzId" value="1"></property>
+                <property name="clazzName" value="高三五班"></property>
+            </bean>
+
+        </property>
+    </bean>
+
+    <bean id="studentSeven" class="com.atguigu.spring.pojo.Student">
+        <property name="sid" value="1001"></property>
+        <property name="sname" value="李梅"></property>
+        <property name="age" value="23"></property>
+        <property name="gender" value="男"></property>
+        <property name="clazz" ref="ClazzOne"></property>
+        <property name="clazz.clazzId" value="10"></property>
+        <property name="clazz.clazzName" value="高三16班"></property>
+    </bean>
+
+    <bean id="studentEight" class="com.atguigu.spring.pojo.Student">
+        <property name="sid" value="1001"></property>
+        <property name="sname" value="李梅"></property>
+        <property name="age" value="23"></property>
+        <property name="gender" value="男"></property>
+        <property name="clazz" ref="ClazzOne"></property>
+        <property name="hobbies">
+            <array>
+                <value>学习</value>
+                <value>唱歌</value>
+                <value>开发</value>
+            </array>
+        </property>
+
+    </bean>
+
+    <bean id="ClazzTwo" class="com.atguigu.spring.pojo.Clazz">
+        <property name="clazzId" value="1"></property>
+        <property name="clazzName" value="高三五班"></property>
+        <property name="students">
+            <list>
+                <ref bean="studentSix"></ref>
+                <ref bean="studentSeven"></ref>
+                <ref bean="studentEight"></ref>
+            </list>
+        </property>
+    </bean>
+
+
+    <bean id="teacherOne" class="com.atguigu.spring.pojo.Teacher">
+        <property name="teacherId" value="10015"></property>
+        <property name="teacherName" value="刘老师"></property>
+    </bean>
+    <bean id="teacherTwo" class="com.atguigu.spring.pojo.Teacher">
+        <property name="teacherId" value="10086"></property>
+        <property name="teacherName" value="二宝老师"></property>
+    </bean>
+
+    <bean id="studentNine" class="com.atguigu.spring.pojo.Student">
+        <property name="sid" value="1001"></property>
+        <property name="sname" value="李梅"></property>
+        <property name="age" value="23"></property>
+        <property name="gender" value="男"></property>
+        <property name="clazz" ref="ClazzOne"></property>
+        <property name="hobbies">
+            <array>
+                <value>学习</value>
+                <value>唱歌</value>
+                <value>开发</value>
+            </array>
+        </property>
+        <!--<property name="teacherMap" ref="teacherOne"></property>
+        bean must be of 'java.util.Map<java.lang.String,com.atguigu.spring.pojo.Teacher>' type
+        -->
+        <property name="teacherMap" >
+            <map>
+                <entry>
+                    <key>
+                        <value>10015</value>
+                    </key>
+                    <ref bean="teacherOne"></ref>
+                </entry>
+
+                <entry>
+                    <key>
+                        <value>10086</value>
+                    </key>
+                    <ref bean="teacherTwo"></ref>
+                </entry>
+            </map>
+        </property>
+
+    </bean>
+
+    <bean id="studentTen" class="com.atguigu.spring.pojo.Student"
+          p:sname="xjj" p:sid="0123" p:clazz-ref="ClazzOne">
+    </bean>
+
+</beans>

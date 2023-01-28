@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd http://www.springframework.org/schema/aop https://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!--1.使用注解+扫描的方式实现ioc-->
+    <!--1.1注解-->
+    <!--1.2扫描-->
+    <context:component-scan base-package="com.atguigu.spring.aop"></context:component-scan>
+
+
+    <!--2.使用xml配置aop-->
+    <aop:config>
+        <aop:aspect ref="loggerAspectByXML">
+            <aop:pointcut id="pointCut" expression="execution(* com.atguigu.spring.aop.annotation.CalculatorImpl.*(..)))"></aop:pointcut>
+            <!--<aop:pointcut id="pointCut" expression="execution(* com.atguigu.spring.aop.*.*.*(..)))"></aop:pointcut>-->
+            <!--<aop:pointcut id="pointCut" expression="execution(* com.atguigu.spring.aop.*.*(..)))"></aop:pointcut>-->
+
+            <aop:before method="beforeAdviceMethod" pointcut-ref="pointCut"></aop:before>
+            <aop:after method="afterAdviceMethod" pointcut-ref="pointCut"></aop:after>
+            <aop:after-returning method="afterReturningAdviceMethod" pointcut-ref="pointCut" returning="result"></aop:after-returning>
+            <aop:after-throwing method="afterThrowingAdviceMethod" pointcut-ref="pointCut" throwing="th"></aop:after-throwing>
+        </aop:aspect>
+    </aop:config>
+</beans>

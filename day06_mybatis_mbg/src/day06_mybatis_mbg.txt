@@ -1,0 +1,193 @@
+MyBatis的逆向工程（mbg == mybatis generate）
+1.正向工程  vs  逆向工程
+  正向工程(类-->库)：先创建Java实体类，由框架负责根据实体类生成数据库表。
+            Hibernate是支持正向工程的。
+  逆向工程(库-->类)：先创建数据库表，由框架负责根据数据库表，反向生成如下资源：
+    - Java实体类
+    - Mapper接口
+    - Mapper映射文件
+2.步骤：
+    1.添加依赖和插件
+        注意逆向工程中pron.xml的配置
+    2.创建MyBatis的核心配置文件(mybatis-config.xml)
+    3.创建逆向工程的配置文件（generatorConfig.xml  名字不可更改）
+
+        generatorConfiguration
+            context id="DB2Tables" targetRuntime="MyBatis3"
+
+                1.数据库的连接信息
+                jdbcConnection(
+                                driverClass="com.mysql.cj.jdbc.Driver"
+                                connectionURL="jdbc:mysql://localhost:3306/ssm?serverTimezone=UTC"
+                                userId="root"
+                                password="123456")
+                2.javaBean的生成策略
+                javaModelGenerator targetPackage="com.atguigu.mybatis.pojo" targetProject=".\src\main\java"
+                    2.1是否能使用子包（上面的.将会看做文件夹分隔）    property name="enableSubPackages" value="true"
+                    2.2将数据库对应表的字段前后的空格去掉建立类的属性 property name="trimStrings" value="true"
+                3.SQL映射文件的生成策略
+                sqlMapGenerator targetPackage="com.atguigu.mybatis.mapper" targetProject=".\src\main\resources"
+                    property name="enableSubPackages" value="true"
+                4.Mapper接口的生成策略
+                javaClientGenerator type="XMLMAPPER"targetPackage="com.atguigu.mybatis.mapper" targetProject=".\src\main\java">
+                    property name="enableSubPackages" value="true"
+                5.逆向分析的表
+                     tableName设置为*号，可以对应所有表，此时不写domainObjectName
+                     domainObjectName属性指定生成出来的实体类的类名
+                table tableName="t_emp" domainObjectName="Emp"
+                table tableName="t_dept" domainObjectName="Dept"
+    4.执行MBG插件的generate目标
+        此时去maven projects-->day06project-->mybatis-generator-->mybatis-generator:generate(双击)
+        如果控制台输入的信息包含：[INFO] BUILD SUCCESS   说明构建成功
+
+3.context的targetRuntime: 执行生成的逆向工程的版本
+    MyBatis3Simple: 生成基本的CRUD（清新简洁版）
+    MyBatis3: 生成带条件的CRUD（奢华尊享版）
+
+4.关于尊享版的mybatis逆向工程生成的CRUD了解
+例如
+ 1.insert的区别：
+    int insert(Emp record);如果添加的对象属性中有null,其依然会将null添加给 对象（不会保留字段值，默认修改为null）
+    int insertSelective(Emp record);如果添加的对象属性中有null,就不再修改数据库的该字段的值（即保留字段值）
+ 2.update的区别：同上
+     updateByExampleSelective选择性修改
+     updateByExample普通修改
+    int updateByExampleSelective(@Param("record") Emp record, @Param("example") EmpExample example);
+    int updateByExample(@Param("record") Emp record, @Param("example") EmpExample example);
+
+ 3.注意：
+    1.需要在生成的Emp和Dept类中自己去加入toString()、无参、有参构造器
+    2.在查询全部数据时可以使用selectBySelect(null)(条件为null表示查询所有数据)
+    3.QBC查询
+        例如：selectBySelect（EmpExample）参数是一个EmpExample
+
+    public void test(){
+        SqlSession sqlSession = SqlSessionUtil.getSqlSession();
+        EmpMapper mapper = sqlSession.getMapper(EmpMapper.class);
+        //查询所有数据
+//        select emp_id, emp_name, age, gender, dept_id from t_emp
+        List<Emp> emps = mapper.selectByExample(null);
+        emps.forEach(System.out::println);
+
+        //根据条件查询
+//        Preparing: select emp_id, emp_name, age, gender, dept_id from t_emp WHERE ( age = ? )
+        EmpExample empExample = new EmpExample();
+        empExample.createCriteria().andAgeEqualTo(343);
+        List<Emp> emps1 = mapper.selectByExample(empExample);
+        emps1.forEach(System.out::println);
+
+//        Preparing: select emp_id, emp_name, age, gender, dept_id from t_emp WHERE ( age = ? ) or( age is null )
+        EmpExample empExample2 = new EmpExample();
+        empExample2.createCriteria().andAgeEqualTo(343);
+        empExample2.or().andAgeIsNull();
+        List<Emp> emps2 = mapper.selectByExample(empExample2);
+        emps2.forEach(System.out::println);
+        sqlSession.close();
+    }
+
+
+4.分页
+    limit index,pageSize
+    pageSize：每页显示的条数
+    pageNum：当前页的页码
+    index：当前页的起始索引，index=(pageNum-1)*pageSize
+    count：总记录数
+    totalPage：总页数
+    totalPage = count / pageSize;
+    if(count % pageSize != 0){
+        totalPage += 1;
+    }
+    pageSize=4，pageNum=1，index=0 limit 0,4
+    pageSize=4，pageNum=3，index=8 limit 8,4
+    pageSize=4，pageNum=6，index=20 limit 8,4
+4.1分页插件的使用步骤
+ ①添加依赖（在porn.xml中）
+    com.github.pagehelper
+    <dependency>
+        <groupId>com.github.pagehelper</groupId>
+        <artifactId>pagehelper</artifactId>
+        <version>5.2.0</version>
+    </dependency>
+ ②配置分页插件(在mybatis-config.xml中)
+    PageInterceptor拦截器 com.github.pagehelper.PageInterceptor
+
+    <plugins>
+        <!--设置分页插件-->
+        <plugin interceptor(拦截器)="com.github.pagehelper.PageInterceptor"></plugin>
+    </plugins>
+4.2分页功能
+    - 1.开启分页功能：PageHelper.startPage(2,5);
+    参数说明：
+        第一个参数代表pageNum(第几页)，当pageNum=1时，其执行的sql中limit后面只有一个？,因为1被省略
+        第二个参数代表PageSize(每一页几条)
+
+        public void testPage(){
+            SqlSession sqlSession = SqlSessionUtil.getSqlSession();
+            EmpMapper mapper = sqlSession.getMapper(EmpMapper.class);
+            //开启分页
+            PageHelper.startPage(2,5);
+            List<Emp> list = mapper.selectByExample(null);
+            list.forEach(System.out::println);
+            sqlSession.close();
+            //分析其内部执行两条sql
+            //1.SELECT count(0) FROM t_emp
+            //2.select emp_id, emp_name, age, gender, dept_id from t_emp LIMIT ?, ?
+        }
+
+    - 2.关于PageHelper.startPage(2,5);返回值
+        Page<Object> objects = PageHelper.startPage(2, 5);
+        objects结果：
+            Page{count=true, pageNum=2, pageSize=5, startRow=5,
+                 endRow=10, total=30, pages=6, reasonable=false,
+                 pageSizeZero=false}
+
+    - 3.在查询获取list集合之后，使用PageInfo可以获取与分页相关的所有数据
+        PageInfo<T> pageInfo = new PageInfo<>(List<T> list, int navigatePages)获取分页相关数据
+            list：分页之后的数据
+            navigatePages：导航分页的页码数
+                        （例如：
+                            首页 上一页 2 3 4 5 6 下一页 末页
+                            上一行的2 3 4 5 6就是navigatePages可以设置的结果，注意：当前页为4
+                            在实际应用中，我们将navigatepageNums属性中的数组作为中间的数字展示）
+        pageInfo结果说明:
+                    PageInfo{pageNum=2,
+                             pageSize=5,
+                             size=5,
+                             startRow=6,
+                             endRow=10,
+                             total=30,
+                             pages=6,
+                             list=Page{count=true, pageNum=2, pageSize=5, startRow=5,
+                                          endRow=10, total=30, pages=6, reasonable=false,
+                                          pageSizeZero=false
+                                          }
+                             [com.atguigu.mybatis.pojo.Emp@299266e2,
+                               com.atguigu.mybatis.pojo.Emp@5471388b,
+                               com.atguigu.mybatis.pojo.Emp@66ea1466,
+                               com.atguigu.mybatis.pojo.Emp@1601e47,
+                               com.atguigu.mybatis.pojo.Emp@3bffddff],
+                               prePage=1,
+                               nextPage=3,
+                               isFirstPage=false,
+                               isLastPage=false,
+                               hasPreviousPage=true,
+                               hasNextPage=true,
+                               navigatePages=5,
+                               navigateFirstPage=1,
+                               navigateLastPage=5,
+                               navigatepageNums=[1, 2, 3, 4, 5]
+                           }
+
+                -------------------------------
+                pageNum：当前页的页码
+                pageSize：每页显示的条数
+                size：当前页显示的真实条数
+                startRow与endRow:对应数据库表中的开启和结尾行数
+                total：总记录数
+                pages：总页数
+                prePage：上一页的页码
+                nextPage：下一页的页码
+                isFirstPage/isLastPage：是否为第一页/最后一页
+                hasPreviousPage/hasNextPage：是否存在上一页/下一页
+                navigatePages：导航分页的页码数
+                navigatepageNums：导航分页的页码，[1,2,3,4,5]

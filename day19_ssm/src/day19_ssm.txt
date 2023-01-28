@@ -1,0 +1,69 @@
+思考：
+我们可以将mybatis交给spring整合，而至于spring和springmvc两者可以整合也可以不整合
+- 整合：各自管理各自的组件（建议）
+- 不整合：spring和springmvc创建同一个ioc容器，我们需要把所有内容配置到同一个配置文件中（或者多个）
+springmvc的ioc容器是在DispatcherServlet初始化时创建的，spring的ioc要在dispatcherServlet初始化之前
+通过下面的listener\filter\servlet的执行顺序，我们可以将其放在listener或者filter中，一般放在listener中
+- 因为springmvc是管理控制层组件，而我们的spring是管理其他组件（例如service层）
+    但是控制层通过自动装配（是在获取ioc容器时完成的）需要使用到service层组件
+1.ServletContextListener（接口）
+    - 服务器三大组件：listener\filter\servlet
+    - Spring提供了监听器ContextLoaderListener，实现ServletContextListener接口，
+    可监听ServletContext的状态，在web服务器的启动，读取Spring的配置文件，
+    创建Spring的IOC容器。web应用中必须在web.xml中配置
+    - ServletContextListener的两个方法
+        void contextInitialized(ServletContextEvent var1);
+        void contextDestroyed(ServletContextEvent var1);
+1.2ContextLoaderListener
+    ContextLoaderListener实现了接口ServletContextListener
+    通过该监听器就可以去监听服务器的状态，在服务器启动时直接创建spring的ioc容器
+    思考：为啥使用监听器：因为监听器的初始化方法只执行一次（获取ioc时只需要创建一次）
+        -   public void contextInitialized(ServletContextEvent event) {
+                 this.initWebApplicationContext(event.getServletContext());
+             }
+             我们进入initWebApplicationContext方法中:
+             a)创建ioc容器：this.context = this.createWebApplicationContext(servletContext);
+             b)共享ioc容器到最大的作用域中：
+               servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, this.context);
+
+1.3 配置Spring的监听器，在服务器启动时加载Spring的配置文件
+1）首先在web.xml中配置监听器
+        <listener>
+            <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+        </listener>
+2）设置spring的xml配置文件
+   第一种配置方法：
+        使用Spring配置文件默认位置和名称：/WEB-INF/applicationContext.xml
+   第二种配置方法：
+        可通过上下文参数自定义Spring配置文件的位置和名称
+            <!--自定义Spring配置文件的位置和名称-->
+            <context-param>
+                <param-name>contextConfigLocation</param-name>
+                <param-value>classpath:spring.xml</param-value>   classpath:就是resources
+            </context-param>
+        这里我么需要区分springmvc获取ioc容器时使用DispatcherServlet时的参数contextConfigLocation，其用的标签servlet的初始化采纳数是<init-param>
+        而现在使用的是上下文初始化参数（当前工程的初始化参数）
+
+2.常见的监听器（三种）
+    ServletContextListener
+    HttpSessionListener
+    HttpSessionAttributeListener
+
+3.实验
+    1)创建web.xml，在其中配置DispatcherServlet（Springmvc记得配置contextConfigLocation）和listener和context-param(Spring配置contextConfigLocation)
+    2)创建springmvc和spring的xml配置文件，
+        对于srpingmvc现在需要 扫描组件、thymeleaf视图解析器
+        对于spring.xml中，暂时不需要加入
+    3)在web-inf下面创建templates创建需要的html页面
+        此时在springmvc中加入 注解驱动、默认的sevlet处理器、视图解析器
+        注意：之前我们出现过设置了注解驱动后，没有提示视图解析器，这是因为mvc的命名空间选错了，要选mvc那个
+    4)创建controller和service层
+    5)在spring.xml中加入组件扫描（因为service层需要注册扫描后才能用于自动装配）
+
+        web.xml(里面引用spring.xml和springmvc.xml)
+        spring.xml
+        springmvc.xml
+
+4.springmvc的ioc容器 vs spring的ioc容器
+    在ssm整合中，springmvc的ioc容器是子容器，spring的ioc容器是父容器
+    子容器是可以访问父容器中的bean,但是父容器不能访问子容器的bean

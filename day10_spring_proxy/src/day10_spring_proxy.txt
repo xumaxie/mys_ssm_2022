@@ -1,0 +1,148 @@
+1.带日志功能的实现类
+ 缺陷：
+    对核心业务功能有干扰
+    附加功能分散在各个业务功能方法中，不利于统一维护
+
+ 解决：
+    核心就是：解耦。把附加功能从业务功能代码中抽取出来
+
+ 解决问题的困难：
+    要抽取的代码在方法内部，靠以前把子类中的重复代码抽取到父类的方式没法解决。
+    所以需要引入新的技术。
+-------------------------------------------------------------------------------
+2.代理模式（二十三种设计模式中的一种）
+ 2.1 概念
+    通过提供一个代理类，让我们在调用目标方法的时候，不再是直接对目标方法进行调用，
+    而是通过代理类间接调用。让不属于目标方法核心逻辑的代码从目标方法中剥离出来——解耦。
+
+    - 代理：将非核心逻辑剥离出来以后，封装
+    - 目标：被代理“套用”了非核心逻辑代码的类、对象、方法。（CalculatorImpl就是一个目标）
+ 2.2静态代理
+  2.2.1实现：
+    CalculatorStaticProxy代理类
+    不仅可以加入日志服务，异常处理(try-catch-finally)
+
+  2.2.2总结：
+        a)灵活性差：静态代理确实实现了解耦，但是由于代码都写死
+        b)代码复用差：当我们另外一个类想实现一样的日志功能时，
+                    其实代码都一样但是静态代理是实现了一个固定的接口，不能实现代码复用
+
+ 2.3动态代理
+  2.3.1需求：
+           将日志功能集中到一个代理类中，将来有任何日志需求，
+          都通过这一个代理类来实现。这就需要使用动态代理技术了
+
+  2.3.2实现
+      我们定义一个ProxyFactory(之所以称为工厂，是因为其可以动态的生成目标类所对应的代理类)
+      - a)Proxy(java.lang.reflect.Proxy).newProxyInstance(classLoader,interfaces,invocationHandler)：
+        创建一个代理实例
+           其中有三个参数：
+            - classLoader：加载动态生成的代理类的类加载器
+                    根类加载器
+                    扩展类加载器
+                    应用类加载器   <-----(我们随便找个自定义类的类加载器都是应用类加载器)
+                        this.getClass().getClassLoader();
+                        ProxyFactory.class.getClassLoader();
+                    自定义类加载器(自己写的，第三方jar包)
+            - interfaces：目标对象实现的所有接口的class对象所组成的数组
+                    通过反射获取:
+                            private Object target;//被代理类的对象
+                            public Object getProxy(){
+                                target.getClass().getInterfaces()
+                            }
+            - invocationHandler：设置代理对象实现目标对象方法的过程，即代理类中如何重写接口中的抽象方法
+                    下面代码中 result = method.invoke(target, args);表示目标对象实现功能的过程，其他代码都是加入的日志功能
+
+                            InvocationHandler invocationHandler = new InvocationHandler() {
+                                @Override
+                                public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                                    /**
+                                     * proxy：代理对象
+                                     * method：代理对象需要实现的方法，即其中需要重写的方法
+                                     * args：method所对应方法的参数
+                                     */
+                                    Object result = null;
+                                    try {
+                                         System.out.println("[动态代理][日志] "+method.getName()+"，参数："+ Arrays.toString(args));
+                                         result = method.invoke(target, args);
+                                         System.out.println("[动态代理][日志] "+method.getName()+"，结 果："+ result);
+                                     } catch (Exception e) {
+                                        e.printStackTrace();
+                                        System.out.println("[动态代理][日志] "+method.getName()+"，异常："+e.getMessage());
+                                      } finally {
+                                        System.out.println("[动态代理][日志] "+method.getName()+"，方法执行完毕");
+                                      }
+                                      return result;
+                                   }
+                                };
+  2.3.3总结：动态代理有两种：
+        1、jdk动态代理，
+                - 要求必须有接口（newProxyInstance(classLoader,interfaces,invocationHandler)的第二个参数）
+                - 最终生成的代理类和目标类实现相同的接口
+                - 最终生成的代理来在com.sun.proxy包下，类名为$proxy2
+        2、cglib动态代理（没有接口时的选择）
+                - 最终生成的代理类会继承目标类，并且和目标类在相同的包下
+
+        注意：在以后的应用中，我们进行bean的配置时设置扫描时，
+              使用jdk动态代理就不行，因为生成的类的位置不在自己的包下
+----------------------------------------------------------------------
+动态代理实例：
+    public class ProxyFactory {
+
+        //被代理类的对象
+        private Object target;
+
+        public ProxyFactory(Object target) {
+            this.target = target;
+        }
+
+        public Object getProxy(){
+            /**
+             * ClassLoader:加载动态生成的代理类的类加载器
+             * interfaces：目标对象实现的所有接口的class对象所组成的数组
+             * invocationHandler h：代理类中如何重写接口中的抽象方法
+             */
+            ClassLoader classLoader = this.getClass().getClassLoader();
+            Class<?>[] interfaces   = target.getClass().getInterfaces();
+            return Proxy.newProxyInstance(classLoader, interfaces, new InvocationHandler() {
+                /**
+                 *
+                 * @param proxy:代理类对象
+                 * @param method：调用的被代理类对象的方法
+                 * @param args：该方法的参数
+                 * @return
+                 * @throws Throwable
+                 */
+                @Override
+                public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                    Object result = null;
+
+                    try {
+                        System.out.println("[动态代理][日志] "+method.getName()+"，参数："+ Arrays.toString(args));
+                        result = method.invoke(target, args);
+                        System.out.println("[动态代理][日志] "+method.getName()+"，结果："+ result);
+                    }catch(Exception e){
+                        e.printStackTrace();
+                        System.out.println("[动态代理][日志] "+method.getName()+"，异常："+e.getMessage());
+                    }finally{
+                        System.out.println("[动态代理][日志] "+method.getName()+"，方法执行完毕");
+                    }
+                    return result;
+                }
+            });
+        }
+    }
+            ----------------------------------------
+    @Test
+    public void testOne(){
+        //创建一个target
+        CalculatorImpl target = new CalculatorImpl();
+        //获取一个代理工厂
+        ProxyFactory proxyFactory = new ProxyFactory(target);
+        //使用代理工厂获取代理(该代理我们可以强转我们需要的类型（这里我们设置为Calculator）)
+        Calculator calculator = (Calculator) proxyFactory.getProxy();
+        System.out.println(calculator);
+        System.out.println("_________________--------");
+        int add = calculator.add(1, 2);
+
+    }

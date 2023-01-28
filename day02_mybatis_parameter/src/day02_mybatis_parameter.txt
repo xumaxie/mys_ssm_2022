@@ -1,0 +1,162 @@
+MyBatis获取参数值的两种方式
+ - 在day01中我们的UserMapper接口中定义的DAO方法都没有参数，
+ - ${}和#{}
+    ${}的本质就是字符串拼接，(会导致sql注入)(注意单引号问题)
+    #{}的本质就是占位符赋值
+
+1.单个字面量类型的参数(单个参数)
+  下面的#{username}其实内部的username可以写任意的字符串，
+  因为在实际方法执行时，并不知道方法的参数名字为username,
+  但是为了看起来有意义，我们一般写的与参数名字一致
+    <select id="getUserByName" resultType="user">
+        select * from t_user where username = #{username}
+        select * from t_user where username = '${username}'
+    </select>
+
+2.多个字面量类型的参数(多个参数)
+ 如果使用#{},报错：PersistenceException（配置文件的错误）
+ 提示： Available parameters are [arg1, arg0, param1, param2]
+ 因为此时mybatis将参数放在一个map集合内，以两种方式存储：
+ a)arg（以0开始）
+ b)param（以1开始）
+    因此我们'{}'内部的值不再是我们自定义，需要写为
+        arg0,arg1(key，参数为value)
+        或
+        param1,param2(key，参数为value)
+    <select id="checkLogin" resultType="User">
+        <!--错误方式：select * from t_user where username = #{username} and password = #{password}-->
+        <!--select * from t_user where username = #{arg0} and password = #{arg1}-->
+        <!--select * from t_user where username = '${arg0}' and password = '${arg1}'-->
+        <!--select * from t_user where username = #{param1} and password = #{param2}-->
+        <!--sselect * from t_user where username = '${param1}' and password = '${param2}'-->
+    </select>
+3.map集合类型的参数（自定义map设置key）
+    c)我们也可以自定义map的key
+    若mapper接口中方法的参数是一个map集合类型，此时就只需使用#{}或${}访问map集合中的key
+
+4.实体类类型的参数（属性名）☆☆☆
+例如我们insertUser(User),此时在UserMapper.xml中需要使用的是我们定义的实体类User的对象的属性名（注意不是成员变量）
+我们直接使用#{}或者${}访问实体类的属性名字即可。
+    <!--void insertUser(User user);-->
+    <insert id="insertUser">
+        insert into t_user values(null,#{username},#{password},#{age},#{gender},#{email})
+    </insert>
+
+    声明：类的成员变量并不等于属性
+        属性是指get或者set方法后，剩余部分首字母变为小写后的才是属性，
+        即使没有成员变量，只要拥有get和set方法我们依然可以访问该属性。
+
+5.使用注解@Param标识参数☆☆☆
+ 如果是多个参数仍然会放在map集合中，但是我们使用了@Param设置的值已经是是map集合的key
+ (或者以param1,param2,...)
+
+ value=可以省略
+    User checkLoginByParm(@Param(value = "username") String username, @Param(value = "password") String password);
+    User checkLoginByParm(@Param("username") String username, @Param("password") String password);
+
+    <select id="checkLoginByParm" resultType="user">
+        select * from t_user where username = #{username} and password = #{password}
+        select * from t_user where username = #{param1} and password = #{param2}
+    </select>
+
+--------------------------------------------------
+1.MyBatis的各种查询功能
+ 1.1查询一个实体类对象
+ 1.2查询一个list集合
+
+ 1.3查询单个数据(注意resultType的格式)
+         Integer别名:Integet int
+         int别名:_integet _int
+         Map别名:map
+         String别名:string
+  resultType="int|Integer|integer|INT|"都可以
+  因为官方提前声明了这些类的别名，又因为不区分大小写，所以上述方式均可以
+     <select id="getCount" resultType="_integer">
+     <select id="getCount" resultType="java.lang.Integer">
+         select count(*) from t_user
+     </select>
+
+ 1.4查询一条数据为map集合（☆☆☆☆☆）
+ 一般我们查询的结果都要转换为实体类的对象，但是当查询结果没有对应的实体类对象时，就需要map集合
+ 例如：我们查询一个部分对应的平均薪资、最高薪资、最低薪资，这样的一条结果是没有对应的实体类的
+
+ 注意：
+    1.其实无论是实体类还是map集合其实结果都差不多，只是map的key不固定,但是实体类的属性是固定的
+        区别：
+        User{id=1, username='root', password='123', age=20, gender='男', email='12345@qq.com'}
+        {password=123, gender=男, id=1, age=20, email=12345@qq.com, username=root}
+
+    2.如果使用map集合查询的结果某个字符值为null，则自动剔除
+
+ 1.5查询多条数据为map集合（两种解决方法☆☆☆☆☆）
+  在1.4上述实验中，我们获取所有用户返回值为Map<String , Object>,但是报错TooManyResultsException
+      - 原因：
+         - 因为是查询一条记录对应一个map,而数据库有多条记录，对应多个map,所以最终报错
+
+      - 解决方法1：☆☆☆多
+         修改返回值类型
+              //    Map<String,Object> getAllUserMap();
+              List<Map<String,Object>> getAllUserMap();
+              结果：
+               {password=123, gender=男, id=1, age=20, email=12345@qq.com, username=root}
+               {password=123456, gender=男, id=6, age=20, email=12345@qq.com, username=admin}
+               {password=000, gender=男, id=7, age=22, email=2564358@qq.com, username=xj}
+               {password=010101, gender=男, id=8, age=23, email=26931@qq.com, username=xlx}
+
+      - 解决方法2：☆
+         使用注解MapKey()，将查询的每一个map放到一个大的map中，但是必须结合MapKey注解
+             @MapKey("id") //意思是把查询结果的id字段作为外面大的map的key
+             Map<String,Object> getAllUserMap();
+             结果：(将id作为了key)
+              {
+               1={password=123, gender=男, id=1, age=20, email=12345@qq.com, username=root},
+               6={password=123456, gender=男, id=6, age=20, email=12345@qq.com, username=admin},
+               7={password=000, gender=男, id=7, age=22, email=2564358@qq.com, username=xj},
+               8={password=010101, gender=男, id=8, age=23, email=26931@qq.com, username=xlx}
+              }
+-----------------------------------------------------------------
+1.特殊SQL的执行（不能使用#{}）
+ 1.1 模糊查询 like
+  因为sql需要我们补充的参数位置在一个字符串内部：'%#{...}%'-->'%?%'，
+  此时如果解析，则sql不会认为这是一个占位符，而是直接认为？是字符串的一部分，
+  此时，sql中要给占位符赋值，发现sql中没有占位符，于是报错
+
+  解决方法1：使用${}
+    select * from t_user where username like "%${targetStr}%"
+
+  解决方法2：仍然使用#{}，需要用到sql的字符串拼接函数concat('%',#{...},'%')
+    select * from t_user where username like concat('%',#{targetStr},'%')
+
+  解决方法3：使用双引号（☆☆☆多）
+         "%"#{...}"%"这样即可
+    select * from t_user where username like "%"#{targetStr}"%"
+
+ 1.2 批量删除 (探索的是使用in的方式)
+    delete from t_user where id=1
+    delete from t_user where id=7 or id=8 or id=9
+    delete from t_user where id in (7,8,9)
+    - 注意 delete from t_user where id in ('7,8,9')报错
+
+    解决方式：使用${}
+        <delete id="deleteByID">
+            <!--错误的：delete from t_user where id in (#{ids})-->
+                因为#{}默认是自动为我们加上字符串拼接
+            <!--正确的：delete from t_user where id in (${ids})-->
+                因为${}需要手动为我们加上字符串拼接'${}'，但是当我门不需要拼接时，直接写${}
+        </delete>
+
+ 1.3 动态设置表名
+    解释：select * from 表名（动态的传入）
+    问题：
+        使用：select * from #{...},报错，因为#{...}，会把表名加上单引号进行拼接
+        例如 select * from 't_user'--》其会报错
+    解决方法：
+        select * from ${...}
+
+ 1.4 添加功能获取自增的主键(☆☆☆☆☆)
+    insert的两个标签属性：
+    1.useGeneratedKeys：表示当前添加功能使用自增的主键
+    2.keyProperty：将添加的数据的自增主键为实体类型的参数的属性赋值
+        <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+            insert into t_user values(null,#{username},#{password},#{age},#{gender},#{email})
+        </insert>

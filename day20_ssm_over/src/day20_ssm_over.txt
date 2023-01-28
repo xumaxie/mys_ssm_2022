@@ -1,0 +1,226 @@
+大实验步骤：
+1.maven的porn.xml配置文件
+    1)packaging
+    2)properties--spring.version
+            <properties>
+                <spring.version>5.3.1</spring.version>
+            </properties>
+    3)dependency
+        1.springmvc
+            spring-context
+            spring-beans
+            spring-web
+            spring-webmvc
+            spring-jdbc    因为事务DataSourceTransactionManager是在spring-jdbc中
+            spring-aspects
+            spring-test
+            这以上所有的version可以直接使用 ${spring.version} 引用properties--spring.version
+
+        2.Mybatis核心
+            mybatis
+        3.mybatis和spring的整合包
+            mybatis-spring
+
+        4.连接池
+            druid
+        5.junit测试
+            junit
+        6.MySQL驱动
+            mysql-connector-java
+        7.log4j日志
+            log4j
+        8. 分页插件
+            pagehelper
+        9.日志（沙拉封后记）
+            logback-classic
+        10.ServletAPI
+            javax.servlet-api
+        11.jackson
+            jackson-databind
+        12.文件上传
+            commons-fileupload
+        13.Spring5和Thymeleaf整合包
+            thymeleaf-spring5
+
+2.创建表t_emp
+    emp_id（非空 自增 主键）  int(11)
+    emp_name（默认值为null）  varchar(20)
+    age（默认值为null）       int(11)
+    sex（默认值为null）       char(1)
+    email（默认值为null）     varchar(50)
+
+3.配置web.xml
+    filter：CharacterEncodingFilter、HiddenHttpMethodFilter
+    servlet：DispatcherServlet（contextConfigLocation）（load-on-startup）
+    context-param：spring的配置文件
+    listener：监听器（spring要在服务器启动时获取ioc容器，以供springmvc使用）
+
+4.创建SpringMVC的配置文件并配置
+    扫描组件(springmvc只需要扫描控制层组件即可)：context:component-scan
+    配置视图解析器：ThymeleafViewResolver（视图前缀、视图后缀）
+    配置访问首页的视图控制：mvc:view-controller
+    配置默认的servlet处理静态资源：mvc:default-servlet-handler
+    开启MVC的注解驱动：mvc:annotation-driven
+    选择：
+        配置文件上传解析器（bean CommonsMultipartResolver）
+        异常处理（bean:SimpleMappingExceptionHandler）
+        拦截器
+5.创建组件：
+          实体类Employee
+          控制层组件EmployeeController
+          创建接口EmployeeService
+          创建实现类EmployeeServiceImpl
+
+6.创建Spring的配置文件并配置
+      扫描组件（不扫描控制层）：context:component-scan
+                  context:exclude-filter（我们以注解的形式排除控制层）
+      2.引入jdbc.properties：
+            context:property-placeholder
+      3.配置Druid数据源（DruidDataSource）
+
+
+5.搭建MyBatis环境
+    ①创建属性文件jdbc.properties
+    ②创建MyBatis的核心配置文件mybatis-config.xml
+    一般设置用到的标签
+        properties
+        settings（mapUnderscoreToCamelCase（驼峰）、延迟加载、 按需加载）（全局配置）
+        typeAliases（packing name写到pojo包）
+        plugins（PageInterceptor）
+        environments（environment-》transactionManager、dataSource-》property）
+        mappers（packing name写到mapper包下）
+
+
+6.创建Mapper接口和映射文件
+    注意四个一致
+
+7.在spring.xml中添加（spring整合mybatis的过程）
+    SqlSessionFactoryBean
+    MapperScannerConfigurer
+    -------------------------------------------------------
+    4.配置用于创建SqlSessionFactory的工厂bean（不需要设置id）
+              1.可省略(property)configLocation:设置MyBatis配置文件的路径
+              2.(property)dataSource:设置数据源
+              3.(property)typeAliasesPackage:设置类型别名所对应的包
+              4.视情况省略(property)mapperLocations设置映射文件的路径若映射文件所在路径和mapper接口所在路径一致，则不需要设置
+    原始方式：
+        通过核心配置文件获取输入流，然后new SqlSessionFactoryBuild
+        然后build(流)-->SqlSessionFactory-->SqlSession
+
+    但是SqlSession或者SqlSessionFactory都是一个对象，可以交给spring管理（主需要注册为bean）
+    例如：
+        通过此方式，我们直接在service的impl中可以直接设置自动装配（@Autowired）private SqlSessionFactory sqlSessionFactory
+    --------------------------------------------------------------------------------
+        <!-- 配置SqlSessionFactoryBean可以直接在spring的ioc中获取sqlSessionFactory对象 -->
+        <bean class="org.mybatis.spring.SqlSessionFactoryBean">
+            <!-- 1.设置MyBatis配置文件的路径configLocation（可以不设置，如果设置了mybatis-config.xml我们就不需要在spring中设置了） -->
+            <property name="configLocation" value="classpath:mybatis-config.xml"></property>
+            <!-- 2.设置数据源 （则在mybatis的xml中就可以删除typeAliases）-->
+            <property name="dataSource" ref="dataSource"></property>
+            <!-- 3.设置类型别名所对应的包（则在mybatis的xml中就可以删除environments） -->
+            <property name="typeAliasesPackage" value="com.atguigu.ssm.pojo"></property>
+            <!--4.设置映射文件的路径
+                若映射文件所在路径和mapper接口所在路径一致，则不需要设置（则在mybatis的xml中就可以删除mappers）-->
+                前提是：<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">这个必须配置才可以不用设置mapperLocations
+            <!--
+                <property name="mapperLocations" value="classpath:mapper/*.xml">  注意这里的路径分隔是`/`不是`.`
+                </property>
+            -->
+            <!--5.关于驼峰的配置，则使用configurationProperties-->
+             <property name="configurationProperties"
+
+            <!--6.关于分页插件pageInterceptor-->
+            <property name="plugins">
+                <array>
+                    <bean class="PageInterceptor的全类名">
+                <array>
+            </property>
+        </bean>
+    --------------------------------------------------------------------------------
+
+    5.配置mapper接口的扫描配置 -- MapperScannerConfigurer
+          由mybatis-spring提供，可以将指定包下所有的mapper接口通过<bean class="org.mybatis.spring.SqlSessionFactoryBean">获取的sqlSessionFactory创建的sqlSession
+          然后来获取basePackage指定包下面的所有接口的代理实现类对象，并且将这个写对象交给ioc容器管理
+
+          创建动态代理
+          并将这些动态代理作为IOC容器的bean管理
+                 MapperScannerConfigurer
+                <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+                    <!--basePackage基础包  -->
+                    <property name="basePackage" value="com.atguigu.ssm.mapper"></property>
+                </bean>
+    我么完成<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">后，不在需要获取sqlSessionFactory,
+    不在需要获取sqlSession,不在使用sqlSession.getMapper方法，而是直接自动装配这些接口类的对象
+7.创建日志文件log4j.xml
+
+8.在spring的xml文件中增加事务管理器（基于注解的、基于xml的）
+    1.<bean id="transactionManager" class="DataSourceTransactionManager">
+        <property name=dataSource ref="">
+    2.开启事务的注解驱动（将@Transaction注解所标识的方法或者类中所有的方法进行事务管理）
+    <tx:annotation-driven transaction-manager="transactionManager">
+    3.在service的impl中使用注解@Transaction
+
+9.测试功能
+    ①创建组件：
+        实体类Employee
+    ②创建页面
+    ③访问测试分页功能
+------------
+1.我们通过mapper实现sql查询所有员工，
+2.然后再service中设置：
+    1.getAllEmployee
+    2.getEmployeePage（int page）
+    在impl中实现这两个方法
+3.然后再controller借助model.addAttribute实现数据由服务器传送到前端
+
+4.在首页中我们设置一个超链接（注意首页永远是第1页）：
+    th:href="@{/employee/page/1}
+5.设置employees.html
+    1)<link rel="stylesheet" th:href="@{/static/css/index_work.css}">
+    2)设置一个
+        <table>
+            <tr>
+        然后遍历用户列表
+    3)设置关于pageInterceptor的部分
+        1.注意：<tr th:each="employee,status : ${page.list}">
+                status是我们使用遍历时可以使用的一些属性，
+                    count:我们使用status.count代表流水号（第一次为1，第二次为2，依次......）
+                    first:是否为第一次循环
+                    index:当前循环的索引
+                    even:循环是偶数次
+                    last:循环是否为最后一次
+                    odd:循环是奇数次
+                    size:获取集合的长度
+                        <td th:text="${status.count}"></td>
+
+        2.设置导航页码
+        page.hasPreviousPage
+        page.pageNum
+        page.hasNextPage
+
+        page.prePage
+        page.navigatepageNums
+        page.nextPage
+        page.pages(最后一页)
+
+            <div style="text-align: center;">
+                <a th:if="${page.hasPreviousPage}" th:href="@{/employee/page/1}">首页</a>
+                <a th:if="${page.hasPreviousPage}" th:href="@{'/employee/page/'+${page.prePage}}">上一页</a>
+                <span th:each="num : ${page.navigatepageNums}">
+                    <a th:if="${page.pageNum == num}" style="color: red;" th:href="@{'/employee/page/'+${num}}" th:text="'['+${num}+']'"></a>
+                    <a th:if="${page.pageNum != num}" th:href="@{'/employee/page/'+${num}}" th:text="${num}"></a>
+                </span>
+                <a th:if="${page.hasNextPage}" th:href="@{'/employee/page/'+${page.nextPage}}">下一页</a>
+                <a th:if="${page.hasNextPage}" th:href="@{'/employee/page/'+${page.pages}}">末页</a>
+            </div>
+
+
+
+
+
+
+
+
+
+
+

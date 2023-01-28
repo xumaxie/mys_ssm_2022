@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.atguigu.mybatis.mapper.EmpMapper">
+
+
+
+    <!--Emp getEmpByID(Integer empId);-->
+
+    <resultMap id="empResultMap" type="emp">
+        <id column="emp_id" property="empId"></id>
+        <result column="emp_name" property="empName"></result>
+        <result column="age" property="age"></result>
+        <result column="gender" property="gender"></result>
+    </resultMap>
+    <select id="getEmpByID" resultMap="empResultMap">
+      select * from t_emp where emp_id=#{empId}
+    </select>
+    <!--<select id="getEmpByID" resultType="emp">-->
+        <!--select * from t_emp where emp_id=#{empId}-->
+    <!--</select>-->
+
+
+    <!--Emp getEmpAndDeptByEmpId(@Param("empId") Integer empId);-->
+    <!--<select id="getEmpAndDeptByEmpId" resultType="emp">
+        select e.*,d.*
+        from t_emp e join t_dept d
+        on e.dept_id=d.dept_id
+        where e.emp_id=#{empId}
+    </select>-->
+    <!--解决多对一的第一种方法-->
+    <resultMap id="EmpAndDeptResultMapOne" type="emp">
+        <id column="emp_id" property="empId"></id>
+        <result column="emp_name" property="empName"></result>
+        <result column="age" property="age"></result>
+        <result column="gender" property="gender"></result>
+        <result column="dept_id" property="dept.deptId"></result>
+        <result column="dept_name" property="dept.deptName"></result>
+    </resultMap>
+    <!--解决多对一的第二种方法-->
+    <resultMap id="EmpAndDeptResultMapTwo" type="emp">
+        <id column="emp_id" property="empId"></id>
+        <result column="emp_name" property="empName"></result>
+        <result column="age" property="age"></result>
+        <result column="gender" property="gender"></result>
+        <association property="dept" javaType="Dept">
+            <!--javaType="Dept" Dept是别名，因为我们使用了typeAliases-->
+            <id column="dept_id" property="deptId"></id>
+            <result column="dept_name" property="deptName"></result>
+        </association>
+    </resultMap>
+    <select id="getEmpAndDeptByEmpId" resultMap="EmpAndDeptResultMapTwo">
+        select e.*,d.*
+        from t_emp e join t_dept d
+        on e.dept_id=d.dept_id
+        where e.emp_id=#{empId}
+    </select>
+
+    <!--解决多对一的第三种方法-->
+    <!--Emp getEmpAndDeptByStep(@Param("empId") Integer empId);-->
+
+    <resultMap id="EmpAndDeptByStepResultMapThree" type="emp">
+        <id column="emp_id" property="empId"></id>
+        <result column="emp_name" property="empName"></result>
+        <result column="age" property="age"></result>
+        <result column="gender" property="gender"></result>
+        <association
+                property="dept"
+                select="com.atguigu.mybatis.mapper.DeptMapper.getEmpAndDeptByStepTwo"
+                column="dept_id"></association>
+    </resultMap>
+    <select id="getEmpAndDeptByStep" resultMap="EmpAndDeptByStepResultMapThree">
+        select * from t_emp where emp_id=#{empId}
+    </select>
+
+
+
+
+    <!--List<Emp> getDeptAndEmpByStep(@Param("deptId") Integer deptId);-->
+    <select id="getDeptAndEmpByStep" resultType="emp">
+        select * from t_emp where dept_id=#{deptId}
+    </select>
+</mapper>

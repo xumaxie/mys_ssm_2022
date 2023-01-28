@@ -1,0 +1,119 @@
+1.缓存：MyBatis有一级缓存和二级缓存
+2.一级缓存是sqlSession级别的(默认开启)
+解释：
+    通过同一个sqlSession查询的结果会被被缓存，
+    当再次使用该sqlSession查询相同的数据，则会从缓存中找
+
+    public void testGetEmpById(){
+        SqlSession sqlSession1 = SqlSessionUtil.getSqlSession();
+        CacheMapper mapper1 = sqlSession1.getMapper(CacheMapper.class);
+        Emp empById = mapper1.getEmpById(1);
+        System.out.println(empById);
+
+        //此时会从一级缓存中找
+        Emp empById2 = mapper1.getEmpById(1);
+        System.out.println(empById2);
+
+        //因为sqlSession变化，所有不会缓存中找，而是执行sql
+        SqlSession sqlSession2 = SqlSessionUtil.getSqlSession();
+        CacheMapper mapper2 = sqlSession2.getMapper(CacheMapper.class);
+        Emp empById3 = mapper2.getEmpById(1);
+        System.out.println(empById3);
+    }
+3.使一级缓存失效的四种情况：
+  1) 不同的SqlSession对应不同的一级缓存
+  2) 同一个SqlSession但是查询条件不同
+  3) 同一个SqlSession两次查询期间执行了任何一次增删改操作
+  4) 同一个SqlSession两次查询期间手动清空了缓存
+        sqlSession.clearCache();
+4.二级缓存
+    是SqlSessionFactory级别，通过同一个SqlSessionFactory创建的SqlSession查询的结果会被缓存
+
+ 4.1二级缓存开启的条件：
+    a>在`核心配置文件`(mybatis-config)中，设置全局配置属性cacheEnabled="true"，
+        默认为true，不需要设置
+    b>在`映射文件`中设置标签<cache/>(例如EmpMapper)
+        <cache/>
+    c>二级缓存必须在SqlSession关闭或提交之后有效(一级缓存才会提交给二级缓存)
+    d>查询的数据所转换的实体类类型必须实现序列化的接口（例如：Emp必须实现Serializable）
+
+    注意：cache hit radio（缓存命中率，主要不是0就说明命中了）
+            InputStream stream = Resources.getResourceAsStream("mybatis-config.xml");
+            SqlSessionFactoryBuilder sqlSessionFactoryBuilder = new SqlSessionFactoryBuilder();
+            SqlSessionFactory build = sqlSessionFactoryBuilder.build(stream);
+            //sqlSession1
+            SqlSession sqlSession1 = build.openSession(true);
+            CacheMapper mapper1 = sqlSession1.getMapper(CacheMapper.class);
+            Emp emp1 = mapper1.getEmpById(1);
+            System.out.println(emp1);
+            sqlSession1.close();
+            //sqlSession2
+            SqlSession sqlSession2 = build.openSession(true);
+            CacheMapper mapper2 = sqlSession2.getMapper(CacheMapper.class);
+
+            Emp emp2 = mapper2.getEmpById(1);
+            System.out.println(emp2);
+    result:
+             EBUG 01-09 10:52:03,503 Cache Hit Ratio [com.atguigu.mybatis.mapper.CacheMapper]: 0.0 (LoggingCache.java:60)
+             DEBUG 01-09 10:52:05,335 ==>  Preparing: select * from t_emp where emp_id = ? (BaseJdbcLogger.java:137)
+             DEBUG 01-09 10:52:05,387 ==> Parameters: 1(Integer) (BaseJdbcLogger.java:137)
+             DEBUG 01-09 10:52:05,495 <==      Total: 1 (BaseJdbcLogger.java:137)
+             Emp{empId=null, empName='张三', age=12, gender='男'}
+             WARN  01-09 10:52:05,512 As you are using functionality that deserializes object streams, it is recommended to define the JEP-290 serial filter. Please refer to https://docs.oracle.com/pls/topic/lookup?ctx=javase15&id=GUID-8296D8E8-2B93-4B9A-856E-0A65AF9B8C66 (SerialFilterChecker.java:46)
+             DEBUG 01-09 10:52:05,517 Cache Hit Ratio [com.atguigu.mybatis.mapper.CacheMapper]: 0.5 (LoggingCache.java:60)
+             Emp{empId=null, empName='张三', age=12, gender='男'}
+ 4.2使二级缓存失效的情况：
+    两次查询之间执行了任意的增删改，会使一级和二级缓存同时失效
+
+5.二级缓存的相关配置（了解）
+(因为缓存是在内存中们不能无限制的放，因此需要策略)
+    1.eviction属性：缓存回收策略（默认为：LRU）
+        LRU（Least Recently Used） – 最近最少使用的：移除最长时间不被使用的对象。
+        FIFO（First in First out） – 先进先出：按对象进入缓存的顺序来移除它们。
+        SOFT
+        WEAK
+    2.flushInterval属性：刷新间隔，单位毫秒
+        默认情况是不设置，也就是没有刷新间隔，缓存仅仅调用语句时刷新（就是执行增删改操作）
+    3.size属性，一般不设置保持默认
+        代表缓存最多可以存储多少个对象
+    4.readOnly属性：只读， true/false
+        true：只读缓存；会给所有调用者返回缓存对象的相同实例。因此这些对象不能被修改。这提供了很重要的性能优势。
+        false：读写缓存；会返回缓存对象的拷贝（通过序列化）。这会慢一些，但是安全，因此默认是false。
+
+6.MyBatis缓存查询的顺序
+    先查询二级缓存
+    如果二级缓存没有命中，再查询一级缓存
+    如果一级缓存也没有命中，则查询数据库
+
+7.整合第三方缓存：EHCache
+    步骤：
+        1.导入jar包到porn.xml(两个内容：①Mybatis EHCache整合包②slf4j日志门面的一个具体实现)
+            </dependencies>
+            | mybatis-ehcache | Mybatis和EHCache的整合包        |
+            | ehcache         | EHCache核心包                   |
+            | slf4j-api       | SLF4J日志门面包                 |
+            | logback-classic | 支持SLF4J门面接口的一个具体实现 |
+        2.创建EHCache的配置文件（ehcache.xml名字是固定的）
+            xml内部内容不用掌握，理解即可
+        3.设置二级缓存的类型（在对应Mapper.xml中设置cache标签的type属性值）
+            <cache type="org.mybatis.caches.ehcache.EhcacheCache"/>
+                            org.mybatis.caches.ehcache.EhcacheCache
+        4.加入logback日志（logback.xml）
+            存在SLF4J时，作为简易日志的log4j将失效，此时我们需要借助SLF4J的具体实现logback来打印日志。
+            创建logback的配置文件logback.xml(名字不可更改，固定)
+            （之前我们使用的是log4j，但是使用logback）
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

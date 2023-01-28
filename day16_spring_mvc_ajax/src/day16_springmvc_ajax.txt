@@ -1,0 +1,235 @@
+1.回顾axios
+/**
+     * axios({
+           url:"",      //请求路径
+           method:"",   //请求方式
+
+           params:{},
+                          //以name=value&name=value的方式发送的请求参数
+                          //不管使用的请求方式是get或post，请求参数都会被拼接到请求地址后
+                          //此种方式的请求参数可以通过request.getParameter()获取
+
+           data:{}
+                          //以json格式发送的请求参数
+                          //请求参数会被保存到请求报文的请求体传输到服务器
+                          //此种方式的请求参数不可以通过request.getParameter()获取
+                          //使用data，则method必须是post，put,delete，（因为get没有请求体，所以不行）
+       }).then(response=){
+           console.log(response.data);
+       });
+     */
+     ------------------------------------------------
+回顾javaweb:
+    var vue = new Vue({
+        el:"#app",
+        methods:{
+            testAjax(){
+                axios.post(
+                    "/xj04/test/ajax?id=1001",             //注意这里的请求路径，需要加上上Application Context路径，
+                    {username:"admin",password:"123456"}
+                ).then(response=>{
+                    console.log(response.data);
+                });
+            }};
+    @RequestMapping("/test/ajax")
+    public void testAjax(Integer id,HttpServletResponse response) throws IOException {
+        sout(id)
+        response.getWriter().write("hello,axios");
+    }
+    ------------------------------------------------
+    axios.post的第一个参数，需要加上上Application Context路径，
+     -----------------------------------------------
+2.@RequestBody -- 请求体
+  @RequestBody可以获取请求体信息，使用@RequestBody注解标识控制器方法的形参，
+  当前请求的请求体就会为当前注解所标识的形参赋值
+    @RequestMapping("/test/ajax")
+    public void testAjax(Integer id, @RequestBody String requestBody, HttpServletResponse response) throws IOException {
+        System.out.println("requestBody:"+requestBody);
+        System.out.println("id:"+id);
+        response.getWriter().write("hello,axios");
+    }
+    但是我们现在把请求体中包含的数据获取后，没有处理其实是没有用的，我们需要处理，
+    在javaweb阶段，我们使用GSON将获取字符串转换为pojo的类对象
+
+2.2使用@RequestBody注解将json格式的请求参数转换为java对象
+
+    a>导入jackson的依赖
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.12.1</version>
+        </dependency>
+    b>在SpringMVC的配置文件中设置<mvc:annotation-driven />
+    c>在处理请求的控制器方法的形参位置，直接设置json格式的请求参数要转换的java类型的形参，使用@RequestBody注解标识即可
+
+    <div id="app">
+        <input type="button" value="使用@RequestBody注解处理json格式的请求参数" @click="testRequestBody()"><br>
+    ---------------------
+    var vue = new Vue({
+        el:"#app",
+        methods:{
+            testRequestBody(){
+                axios.post(
+                    "/xj04/test/RequestBody/json",
+                    {username:"admin",password:"123456",age:23,gender:"男"}
+                ).then(function (response) {
+                    console.log(response.data);
+                });}}});
+    ---------------------
+    //    @PostMapping("/test/RequestBody/json")
+    //    public void testRequestBody(@RequestBody User user, HttpServletResponse response) throws IOException {
+    //        System.out.println(user);
+    //        response.getWriter().write("收到你传递的User对象");
+
+    //    }
+
+    @RequestMapping("/test/RequestBody/json")
+    public void testRequestBody(@RequestBody Map<String, Object> map, HttpServletResponse response) throws IOException {
+        System.out.println(map);
+        response.getWriter().write("hello,RequestBody");
+    }
+
+3、@ResponseBody：将所标识的控制器方法的返回值作为响应报文的响应体响应到浏览器
+    如果没有@ResponseBody修饰时，我们实现的是Thymeleaf的视图转发
+
+    @RequestMapping("/test/ResponseBody")
+    @ResponseBody
+    public String ResponseBody(){
+        return "success";  //此时这个success不是视图，而是将该返回值作为响应报文的响应体返回给浏览器
+    }
+
+4、使用@ResponseBody注解响应浏览器json格式的数据
+    a>导入jackson的依赖
+    b>在SpringMVC的配置文件中设置<mvc:annotation-driven />
+    c>将需要转换为json字符串的java对象直接作为控制器方法的返回值，使用@ResponseBody注解标识控制器方法
+        就可以将java对象直接转换为json字符串，并响应到浏览器
+
+5.常用的Java对象转换为json的结果：
+        实体类-->json对象  {}
+        map-->json对象    {{},{},{}}
+        list-->json数组  [{},{},{}]
+
+6.@RestController注解
+    是springMVC提供的一个`复合注解`，标识在控制器的类上，
+    就相当于为类添加了@Controller注解，并且为其中的每个方法添加了@ResponseBody注解
+
+-----------------------------------------------------------------------------------------------------------------
+
+7.文件上传和下载
+7.1文件下载
+- ResponseEntity`用于控制器方法的返回值类型`，该控制器方法的返回值就是响应到浏览器的响应报文
+- 使用ResponseEntity实现下载文件的功能
+
+7.2ResponseEntity:可以作为`控制器方法的返回值`，表示`响应到浏览器的完整的响应报文`
+    参数说明：
+        public ResponseEntity(T body,MultiValueMap<String, String> headers,HttpStatus status) {
+            - 响应体：T body,
+            - 响应头：MultiValueMap<String, String> headers,
+            - 状态码：HttpStatus status
+7.3文件下载的实现：
+    我们需要一个参数HttpSession,因为需要下载文件，相当于一个复制，那我们需要知道下载资源位于服务器上的位置
+        因为：session可以获取servletContext,而servletContext中有getRealPath方法可以获取指定资源的真实路径
+        ServletContext servletContext = session.getServletContext();
+        //获取服务器中文件的真实路径
+        1.String realPath = servletContext.getRealPath("");//空字符串，则获取当前工程在服务器的真实路径
+                D:\UserIntellijIDEA\mys_ssm_2022\day16_spring_mvc_ajax\target\day16_spring_mvc_ajax-1.0-SNAPSHOT
+                上面这个结果是我们使用了Maven，在我们javaweb阶段这个getRealPath将会在out文件夹下而不是target下
+        2.String realPath = servletContext.getRealPath("static/img/1.jpg");
+            这个结果将是在1输入的路径基础上进行拼接
+                D:\UserIntellijIDEA\mys_ssm_2022\day16_spring_mvc_ajax\target\day16_spring_mvc_ajax-1.0-SNAPSHOT拼接
+                但是设计一个/或者\这个路径分隔符问题
+                D:\UserIntellijIDEA\mys_ssm_2022\day16_spring_mvc_ajax\target\day16_spring_mvc_ajax-1.0-SNAPSHOT\static\img\1.jpg
+                而且static前可加可不加路径分隔符
+         3.//获取ServletContext对象
+                   ServletContext servletContext = session.getServletContext();
+                   //获取服务器中文件的真实路径
+                   String realPath = servletContext.getRealPath("static/img/1.jpg");
+
+                   //创建输入流
+                   InputStream is = new FileInputStream(realPath);
+                   //创建字节数组
+                   byte[] bytes = new byte[is.available()];
+                   //将流读到字节数组中
+                   is.read(bytes);
+
+                   //创建HttpHeaders对象设置响应头信息
+                   MultiValueMap<String, String> headers = new HttpHeaders();//实现了接口MultiValueMap，因为无论响应头还是请求头，本质都是map
+                   //设置要下载方式以及下载文件的名字 attachment以附件的方式下载，filename下载文件默认的名字
+                    "Content-Disposition"是固定格式
+                    attachment;filename=是固定格式
+                   headers.add("Content-Disposition", "attachment;filename=1.jpg");
+                   //设置响应状态码
+                   HttpStatus statusCode = HttpStatus.OK;
+                   //创建ResponseEntity对象
+                   ResponseEntity<byte[]> responseEntity = new ResponseEntity<>(bytes, headers,statusCode);
+                   //关闭输入流
+                   is.close();
+                   return responseEntity;
+
+    无论下载的是什么，流程都是这个样，只需要修改路径即getRealPath的参数
+7.4文件上传的实现：
+- 文件上传要求form表单的请求方式必须为post，
+        enctype（enctype是EncodeType的简写） 属性规定在发送到服务器之前应该如何对表单数据进行编码。默认地，表单数据会编码为 "application/x-www-form-urlencoded"
+
+        值	                                描述
+        application/x-www-form-urlencoded	在发送前编码所有字符（默认）
+        multipart/form-data	                不对字符编码。在使用包含文件上传控件的表单时，必须使用该值。
+        text/plain	                        空格转换为 "+" 加号，但不对特殊字符编码。
+
+    并且添加属性enctype="multipart/form-data"代表以二进制方式传输数据
+    <form th:action="@{/test/up}" method="post" enctype="multipart/form-data">
+        头像：<input type="file" name="photo"><br>
+        <input type="submit" value="上传">
+    </form>
+
+- 上传步骤：
+    ①添加依赖：commons-fileupload
+    ②在SpringMVC的配置文件中添加配置bean：CommonsMultipartResolver（文件上传解析器）
+        CommonsMultipartResolver的id
+        springmvc是在获取CommonsMultipartResolver时是不是通过类型class获取的而是通过id，
+        id是固定的为“multipartResolver”
+            <bean
+                id="multipartResolver"
+                class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+            </bean>
+
+    ③控制器方法：（MultipartFile对象）
+            SpringMVC中将上传的文件封装到MultipartFile对象中，通过此对象可以获取文件相关信息
+
+            @RequestMapping("/test/up")
+            public String testUp(MultipartFile photo, HttpSession session) throws IOException {
+                //获取上传的文件的文件名
+                String fileName = photo.getOriginalFilename();  //这个名字就是你在本地的文件名字
+                //处理文件重名问题
+                String hzName = fileName.substring(fileName.lastIndexOf("."));
+                fileName = UUID.randomUUID().toString() + hzName;
+                //获取服务器中photo目录的路径
+                ServletContext servletContext = session.getServletContext();
+                String photoPath = servletContext.getRealPath("photo");
+                File file = new File(photoPath);
+                if(!file.exists()){
+                    file.mkdir();
+                }
+                String finalPath = photoPath + File.separator + fileName;
+                //实现上传功能
+                photo.transferTo(new File(finalPath));
+                return "success";
+            }
+
+8.补充：
+    1.关于controller中，如果一个方法的返回值为void,假设注解为@RequestMapping("请求地址")，则默认将“请求地址”作为“逻辑视图”进行返回。
+    2.我们推荐在真实开发中，在设置关于路径分隔符时，使用File.separator进行字符串拼接
+        但是我测试(windows下)发现getRealPath会将`/`转换为windows的分隔符`\`
+    3.Springmvc的配置文件是在DispatcherServlet初始化的时候解析的，而我们在配置配置
+        DispatcherServlet时将其初始化的时间提前到服务器启动时，所以我们的Springmvc配置文件
+        在加载器也是服务器启动时，所以我们的所有bean都会被加载（只要是单例（初始化、实例化都会在获取ioc是获取））
+
+    4.文件重名问题解决：UUID.randomUUID().toString()
+
+-------------------------------------------------
+
+
+
+
+
+

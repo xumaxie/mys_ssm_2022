@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd">
+
+    <!--引入  jdbc.properties-->
+    <context:property-placeholder location="jdbc.properties"></context:property-placeholder>
+    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
+        <!--方式1：使用setter注入-->
+        <!--<property name="url" value="jdbc:mysql://localhost:3306/ssm?serverTimezone=UTC"></property>-->
+        <!--<property name="username" value="root"></property>-->
+        <!--<property name="password" value="010205"></property>-->
+        <!--<property name="driverClassName" value="com.mysql.cj.jdbc.Driver"></property>-->
+        <property name="url" value="${jdbc.url}"></property>
+        <property name="username" value="${jdbc.username}"></property>
+        <property name="password" value="${jdbc.password}"></property>
+        <property name="driverClassName" value="${jdbc.driver}"></property>
+        <!--<property name="initialSize" value="10"></property>-->
+        <!--<property name="maxActive" value="8"></property>-->
+
+    </bean>
+
+</beans>

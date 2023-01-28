@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.atguigu.mybatis.mapper.SpecialMapper">
+<!-- List<User> getUserByLike(@Param("targetStr") String targetStr);-->
+    <select id="getUserByLike" resultType="user">
+        <!-- select * from t_user where username like "%${targetStr}%"-->
+        <!--select * from t_user where username like concat('%',#{targetStr},'%')-->
+         select * from t_user where username like "%"#{targetStr}"%"
+    </select>
+
+    <!--void deleteByID(String ids);-->
+    <delete id="deleteByID">
+        <!--错误的：delete from t_user where id in (#{ids})-->
+        delete from t_user where id in (${ids})
+    </delete>
+
+    <!--List<User> getAllUserList(@Param("tablename") String tablename)-->
+    <select id="getAllUserList" resultType="user">
+        select * from ${tablename}
+    </select>
+
+    <!--void insertUser(User user);//因为user是一个我们的实体类，这里无需@Param-->
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        insert into t_user values(null,#{username},#{password},#{age},#{gender},#{email})
+
+    </insert>
+</mapper>

@@ -1,0 +1,181 @@
+项目流程记录：
+1.创建maven项目（day01_mybatis_helloworld）
+  - 1.配置porn.xml文件
+        加入packaging和dependencies
+
+2.创建数据库ssm和表t_user,并且创建对应的pojo类
+
+3.创建MyBatis的核心配置文件（位置：src/main/resources）
+    一般命名为：mybatis-config.xml
+    内部：我们可以从下载的mybatis的pdf说明中找
+        F:\视频资料\xj_JAVA\3.SSM资料\mybatis-3.5.7\mybatis-3.5.7\mybatis-3.5.7.pdf
+        1.environments:environments是配置连接数据库的环境
+        2.mappers:引入mybatis的映射文件   （sql语句映射文件中）
+
+4.创建mapper 接口：（相当于原来的DAO）
+    一般起名针对哪个pojo类，例如User我们就命名为：UserMapper.java
+
+5.创建Mybatis映射文件
+- MyBatis映射文件存放的位置是src/main/resources/mappers目录下
+- 一个映射文件对应一个实体类，对应一张表的操作
+    例如User所对应的映射文件为UserMapper.xml
+- 在UserMapper.xml中的mapper标签中放的就是mysql的操作
+
+- 注意：mapper接口与mybatis映射文件是对应的,需要保证两个一致
+    1.mapper接口的全类名和映射文件的命名空间（namespace）保持一致
+    2.mapper接口中方法的方法名和映射文件中编写SQL的标签的id属性保持一致
+    例如：UserMapper.java与UserMapper.xml
+
+6.将映射文件引入核心配置文件（标签mappers）
+    //1. 获取核心配置文件的输入流
+    //2. 获取SqlSessionFactoryBuilder对象
+    //3. 获取sqlSessionFactory对象
+    //4. 获取sql的会话对象sqlSession，是Mybatis提供的操作数据库的对象
+    //5. 获取UserMapper的代理实现类对象
+    //6. 调用mapper接口的方法，实现添加用户信息的功能
+    //7. 提交事务
+    //8. 关闭SqlSession
+注意：
+    1.sql有自己的唯一标识：
+    例如:"com.atguigu.mybatis.mapper.UserMapper.insertUser"
+        int result = sqlSession.insert("com.atguigu.mybatis.mapper.UserMapper.insertUser");
+    2.可以设置sql事务自动提交(这样只有就不需要手动commit)
+        SqlSession sqlSession = build.openSession(true);
+
+7.在porn.xml加入log4j的日志,并且在src/main/resources下设置log4j.xml
+
+8.由于获取sqlSession是一个繁琐的过程，我们将其抽单独取为一个功能方法
+com.atguigu.mybatis.com.atguigu.SqlSessionUtil
+
+9.实现一下updateUser、deleteUser
+流程：
+    1.在UserMapper接口中加入该方法，
+    2.在UserMapper.xml(update和delete标签)配置id，并写好sql语句
+    3.在测试类中测试
+
+10.实现一下查询query
+    1.查询单个User:getUserById
+       在UserMapper中设计到两个标签的属性
+        - resultType:设置结果类型 ，即将查询的结果转换的目标java类名（需要全类名）
+        - resultMap：自定义映射，处理一对多或多对一的映射
+    <select id="getUserById" resultType="com.atguigu.mybatis.pojo.User">
+        SELECT * FROM t_user where id=1
+    </select>
+
+    2.查询所有User（设置的依然是resultType）
+    因为我们查询的数据依然是对应的User类，因此resultType查询单个对象设置一致
+        - resultType:设置结果类型 ，即将查询的结果转换的目标java类名（需要全类名）
+
+    <select id="getAllUser" resultType="com.atguigu.mybatis.pojo.User">
+        SELECT * FROM t_user
+    </select>
+
+11.核心配置文件mybatis-config.xml详情
+
+    MyBatis核心配置文件中的标签必须要按照指定的顺序配置：
+        （如果没有按照顺序，则会报错，我们按照报错信息修改即可）
+        properties?,settings?,typeAliases?,typeHandlers?,
+        objectFactory?,objectWrapperFactory?,reflectorFactory?,
+        plugins?,environments?,databaseIdProvider?,mappers?
+
+ 1.environments标签
+        environments：配置连接数据库的环境
+        属性：
+            default：设置默认使用的环境的id
+     1.1environment
+        environment：设置一个具体的连接数据库的环境
+        属性：
+            id：设置环境的唯一标识，不能重复
+      1.1.1transactionManager
+        transactionManager：设置事务管理器
+        属性：
+            type：设置事务管理的方式
+            type="JDBC|MANAGED"
+                JDBC：表示使用JDBC中原生的事务管理方式
+                MANAGED：被管理，例如Spring
+      1.1.2dataSource
+        dataSource：设置数据源
+        属性：
+            type：设置数据源的类型
+            type="POOLED|UNPOOLED|JNDI"
+                POOLED：表示使用数据库连接池
+                UNPOOLED：表示不使用数据库连接池
+                JNDI：表示使用上下文中的数据源
+
+ 2.mappers引入mybatis的映射文件
+    - mappers-->mapper
+    - mappers-->package
+    - 以包的方式引入映射文件，但是必须满足两个条件：
+        1、mapper接口和映射文件所在的包必须一致(见4)
+        2、mapper接口的名字和映射文件的名字必须一致
+        因此我们需要在resources中建立一个多级目录与java文件夹中的mapper相对应
+
+        3.流程：
+            1.确定对应的UserMapper.java路径
+                src/main/java/com/atguigu/mybatis/mapper/UserMapper.java；
+            2.设置对应的路径
+                src/main/resources/com/atguigu/mybatis/mapper；
+            3.然后把UserMapper.xml放进来即可。
+            4.修改核心配置文件，将mapper转变为package的方式
+                - 原始：
+                    <mappers>
+                        <mapper resource="mappers/UserMapper.xml"/>
+                    </mappers>
+                - 现在
+                    <mappers>
+                        <package name="com.atguigu.mybatis.mapper"/>
+                    </mappers>
+        4.说明：src/java和src/resource
+            虽然两种形式上是两个文件夹，但是在项目加载后是在同一个文件夹，
+            这解释了1的要求
+ 3.properties(resource属性设置为“jdbc.properties”)
+    引入properties文件，此后就可以在当前文件中使用${key}的方式访问value
+ 4.typeAliases-->typeAliase
+    typeAliases：设置类型别名，即为某个具体的类型设置一个别名
+                 在MyBatis的范围中，就可以使用别名表示一个具体的类型
+    - 属性：
+        type：设置需要起别名的类型
+        alias：设置某个类型的别名
+            <typeAliases>
+                <typeAlias type="com.atguigu.mybatis.pojo.User" alias="abc"></typeAlias>
+            </typeAliases>
+    - 1.设置别名后，我们可以在UserMapper.xml中使用别名
+        - 对比（使用别名前）：
+            <select id="getAllUser" resultType="com.atguigu.mybatis.pojo.User">
+                SELECT * FROM t_user
+            </select>
+        - 对比（使用别名后）：
+            <select id="getAllUser" resultType="abc">
+                SELECT * FROM t_user
+            </select>
+    - 2.若不设置alias，当前的类型拥有默认的别名，即类名且不区分大小写
+        <typeAlias type="com.atguigu.mybatis.pojo.User"></typeAlias>
+
+ 5.typeAliases-->package（☆☆☆）
+    - 注意：(name的值是到包一级的路径，没有出现类名)
+    - 通过包设置类型别名，指定包下所有的类型将全部拥有默认的别名，即类名且不区分大小写
+        <typeAliases>
+            <package name="com.atguigu.mybatis.pojo"/>
+        </typeAliases>
+
+        此时在UserMapper中可以使用系统提供的默认别名
+        <select id="getAllUser" resultType="user">
+                SELECT * FROM t_user
+        </select>
+
+12.将数据库连接池的四个必须项设置为properties文件（Resource Bundle）
+    不在写在核心配置文件xml中
+    properties的位置：
+        src/main/resources下
+    步骤：
+        1.我们在properties中设置的条目，我们可以加上一个前缀（见名知意）
+            jdbc.driver=com.mysql.cj.jdbc.Driver
+            jdbc.url=jdbc:mysql://localhost:3306/ssm?serverTimezone=UTC
+            jdbc.username=root
+            jdbc.password=010205
+        2.使用${}的方式调用properties中的配置
+            在核心配置文件的environment下
+             <property name="driver" value="${jdbc.driver}"/>
+             <property name="url" value="${jdbc.url}"/>
+             <property name="username" value="${jdbc.username}"/>
+             <property name="password" value="${jdbc.password}"/>

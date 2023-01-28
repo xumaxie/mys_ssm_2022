@@ -1,0 +1,127 @@
+1.注解配置bean
+
+2.实验一：
+ 步骤：
+    ①新建Maven Module
+    ②创建Spring配置文件（spring-ioc-annotation）
+    ③标识组件的常用注解
+        (
+            @Component：将类标识为普通组件(组件就是一个一个的bean)
+            @Controller：将类标识为控制层组件
+            @Service：将类标识为业务层组件
+            @Repository：将类标识为持久层(DAO)组件
+        )
+        - @Controller、@Service、@Repository这三个注解只是在@Component注解的基础上起了三个新的名字。
+        - 所以@Controller、@Service、@Repository这三个注解只是给开发人员看的，让我们能够便于分辨组件的作用
+    ④创建组件(就是controller、service、DAO等包，然后再类上加上对应的注解)
+    ⑤扫描组件（配置xml文件，context:component-scan标签）
+        - 情况一：最基本的扫描方式
+            下面三种都可以，但是写的越精确，扫描时间越短
+            <context:component-scan base-package="com.atguigu.spring.controller,com.atguigu.spring.service.impl"></context:component-scan>
+            <context:component-scan base-package="com.atguigu.spring"></context:component-scan>
+            <context:component-scan base-package="com.atguigu"></context:component-scan>
+            ----------------------------------------
+        - 情况二：指定要排除的组件（☆☆☆☆☆）
+            格式：
+            <context:component-scan base-package>
+                <context:exclude-filter标签的type>
+                ----------------------------------------
+                ontext:exclude-filter标签：指定排除规则
+                    type：设置排除或包含的依据；
+                        常用的两个取值：
+                                type="annotation(某个注解标注的类全部排除)|assignable(排除某个类)"。
+                    expression中设置要排除的注解的全类名
+
+            <context:component-scan base-package="com.atguigu">
+                1.type="annotation"
+                    org.springframework.stereotype.Controller是@Controller的全类名
+                <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+                2.type="assignable"
+                    com.atguigu.controller.UserController是某个类的全类名
+                <context:exclude-filter type="assignable" expression="com.atguigu.controller.UserController"/>
+            </context:component-scan>
+            ----------------------------------------
+        - 情况三：仅扫描指定组件（需要use-default-filters="false"属性）(☆)
+            格式：
+            <context:component-scan base-package="" use-default-filters="">
+                <context:include-filter type="" expression="">
+                ----------------------------------------
+                <context:component-scan base-package="com.atguigu" use-default-filters="false">
+                    <!-- context:include-filter标签：指定在原有扫描规则的基础上追加的规则 -->
+                    <!-- use-default-filters属性：取值false表示关闭默认扫描规则 -->
+                    <!-- 此时必须设置use-default-filters="false"，因为默认规则即扫描指定包下所有类 -->
+                    <!--
+                        type：设置排除或包含的依据
+                        type="annotation"，根据注解排除，expression中设置要排除的注解的全类名
+                        type="assignable"，根据类型排除，expression中设置要排除的类型的全类名
+                     -->
+                    <context:include-filter type="annotation"expression="org.springframework.stereotype.Controller"/>
+                    <!--<context:include-filter type="assignable"expression="com.atguigu.controller.UserController"/>-->
+                </context:component-scan>
+
+
+3.总结：
+           context:exclude-filter：排除扫描
+           type：设置排除扫描的方式
+           type="annotation|assignable"
+               annotation：根据注解的类型进行排除，expression需要设置排除的注解的全类名
+               assignable：根据类的类型进行排除，expression需要设置排除的类的全类名
+
+           context:include-filter：包含扫描（只扫描某某某）
+           注意：需要在context:component-scan标签中设置use-default-filters="false"（使用默认的过滤规则）
+
+               use-default-filters="true"（默认），所设置的包下所有的类都需要扫描，此时可以使用排除扫描
+               use-default-filters="false"，所设置的包下所有的类都不需要扫描，此时可以使用包含扫描
+
+
+4.组件所对应的bean的id（用于在getBean式使用）
+        UserController controllerBean = ioc.getBean(UserController.class);
+        UserController controllerBean2 = ioc.getBean("userController",UserController.class);
+
+- 默认情况（☆☆☆☆☆）
+    类名首字母小写就是bean的id。例如：UserController类对应的bean的id就是userController。
+- 自定义bean的id（☆）
+    可通过标识组件的注解的value属性设置自定义的bean的id
+    @Service("userService")//默认为userServiceImpl public class UserServiceImpl implements
+
+
+5.基于注解的自动装配
+ 实验描述：
+    在第一个实验中我们是对类使用四个注解进行修饰，下面是针对类中的属性（本质是别的类的对象）赋值，
+     我们只需在UserController中和UserServiceImpl中加入@Autowired，
+     之后我们通过UserController调用userService属性时，会自动根据byType对其进行赋值
+        例如：
+            @Autowired
+            private UserService userService;
+
+
+ 知识点：
+    1、@Autowired 注解能够标识的位置
+     * a>标识在成员变量上，此时不需要设置成员变量的set方法
+             @Autowired
+             private UserService userService;
+     * b>标识在set方法上
+     * c>标识在为当前成员变量赋值的有参构造上
+
+
+     2、@Autowired注解的原理
+     * a>默认通过byType的方式，在IOC容器中通过类型匹配某个bean为属性赋值（☆☆☆☆☆）
+
+     * b>若有多个类型匹配的bean，此时会自动转换为byName的方式实现自动装配的效果
+         即将要赋值的属性的属性名作为bean的id匹配某个bean为属性赋值
+          例如：对于private UserService userService;将userService作为id查询bean
+
+     * c>若byType和byName的方式都无妨实现自动装配，即IOC容器中有多个类型匹配的bean
+         且这些bean的id和要赋值的属性的属性名都不一致，此时抛异常：NoUniqueBeanDefinitionException
+
+     * d>此时可以在要赋值的属性上，添加一个注解@Qualifier（基本不用）
+         通过该注解的value属性值，指定某个bean的id，将这个bean为属性赋值
+                @Autowired
+                @Qualifier("userServiceImpl")
+                private UserService userService;
+
+        注意：若IOC容器中没有任何一个类型匹配的bean，此时抛出异常：NoSuchBeanDefinitionException
+         * 在@Autowired注解中有个属性required，默认值为true，要求必须完成自动装配
+         * 可以将required设置为false，此时能装配则装配，无法装配则使用属性的默认值
+         @Autowired(required=false)
+         */
